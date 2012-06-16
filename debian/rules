@@ -1,16 +1,21 @@
 #!/usr/bin/make -f
 
-# Backends (mongodb removed for now, fails to compile)
-backends := ldap pipe gmysql gpgsql gsqlite gsqlite3 geo lua
+PACKAGE = pdns
+OOT = --builddirectory=build
+
+# Backends for dynamic (mongodb removed for now, fails to compile)
+backends_dyn := ldap pipe gmysql gpgsql gsqlite gsqlite3 geo lua
+
+# Backends for static (ldap removed for now, doesn't configure)
+backends_sta := pipe gmysql gpgsql gsqlite gsqlite3 geo lua
 
 DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-# Use new build system
 %:
 	dh $@ --with autotools_dev,autoreconf --parallel
 
 override_dh_auto_configure:
-	./configure \
+	dh_auto_configure $(OOT)-dyn -- \
 		--host=$(DEB_HOST_GNU_TYPE) \
 		--build=$(DEB_BUILD_GNU_TYPE) \
 		--prefix=/usr \
@@ -26,6 +31,35 @@ override_dh_auto_configure:
 		--with-boost=/usr \
 		--enable-cryptopp \
 		--disable-recursor
+	dh_auto_configure $(OOT)-sta -- \
+		--host=$(DEB_HOST_GNU_TYPE) \
+		--build=$(DEB_BUILD_GNU_TYPE) \
+		--prefix=/usr \
+		--sysconfdir=/etc/powerdns \
+		--mandir=\$${prefix}/share/man \
+		--infodir=\$${prefix}/share/info \
+		--libdir='$${prefix}/lib/powerdns' \
+		--libexecdir='$${prefix}/lib' \
+		--with-dynmodules="" \
+		--with-modules="$(backends)" \
+		--with-pgsql-includes=`pg_config --includedir` \
+		--with-mysql-lib=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--with-boost=/usr \
+		--enable-cryptopp \
+		--disable-recursor \
+		--enable-static-binaries
+
+override_dh_auto_build:
+	$(MAKE) -C build-sta
+	$(MAKE) -C build-dyn
+
+override_dh_auto_install:
+        $(MAKE) -C build-sta/ install DESTDIR=$(CURDIR)/debian/tmp-sta
+        $(MAKE) -C build-dyn/ install DESTDIR=$(CURDIR)/debian/tmp-dyn
+
+override_dh_install:
+        dh_install -p$(PACKAGE)        --sourcedir=debian/tmp-dyn
+        dh_install -p$(PACKAGE)-static --sourcedir=debian/tmp-sta
 
 # pdns-server has a debug package
 override_dh_strip:
@@ -35,4 +69,3 @@ override_dh_strip:
 override_dh_fixperms:
 	dh_fixperms
 	chmod 755 debian/pdns-server/etc/resolvconf/update.d/pdns
-

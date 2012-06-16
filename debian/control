@@ -23,7 +23,23 @@ Description: extremely powerful and versatile nameserver
  This is the authoritative nameserver that answers questions about
  domains that it knows about. It also includes the bind backend that
  allows PowerDNS to retrieve domain info from zone files as used by
- the "bind" software.
+ the "bind" software. Other backends can be installed from their
+ respective packages and dynamically loaded.
+
+Package: pdns-static
+Architecture: any
+Depends: pdns-doc, ucf (>= 0.28), adduser
+Replaces: pdns
+Suggests: pdns-recursor
+Description: extremely powerful and versatile nameserver (static)
+ PowerDNS is a versatile nameserver which supports a large number
+ of different backends ranging from simple zonefiles to relational
+ databases and load balancing/failover algorithms.
+ PowerDNS tries to emphasize speed and security.
+ .
+ This is the authoritative nameserver that answers questions about
+ domains that it knows about. This package contains a statically
+ linked binary containing all backends.
 
 Package: pdns-server-dbg
 Section: debug
