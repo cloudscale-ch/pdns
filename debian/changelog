@@ -1,6 +1,8 @@
-pdns (3.1-1.0) UNRELEASED; urgency=low
+pdns (3.1-1.0) squeeze; urgency=low
 
   * NOT YET RELEASED
+  * test backport to squeeze
+  * reduce debhelper dependency to 7
 
  -- Marc Haber <mh+debian-packages@zugschlus.de>  Mon, 14 May 2012 21:14:38 +0200
 
