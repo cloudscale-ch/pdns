@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+include /usr/share/dpkg/architecture.mk
+
 PACKAGE = pdns
 OOT = --builddirectory=build
 
@@ -7,7 +9,7 @@ OOT = --builddirectory=build
 backends_dyn := ldap pipe gmysql gpgsql gsqlite gsqlite3 geo lua
 
 # Backends for static (ldap removed for now, doesn't configure)
-backends_sta := pipe gmysql gpgsql gsqlite gsqlite3 geo lua
+backends_sta := ldap pipe gmysql gpgsql gsqlite gsqlite3 geo lua
 
 DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
@@ -15,6 +17,8 @@ DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 	dh $@ --with autotools_dev,autoreconf --parallel
 
 override_dh_auto_configure:
+	mkdir build-dyn && \
+	cp -a pdns modules config* Makefile* build-dyn
 	dh_auto_configure $(OOT)-dyn -- \
 		--host=$(DEB_HOST_GNU_TYPE) \
 		--build=$(DEB_BUILD_GNU_TYPE) \
@@ -24,13 +28,15 @@ override_dh_auto_configure:
 		--infodir=\$${prefix}/share/info \
 		--libdir='$${prefix}/lib/powerdns' \
 		--libexecdir='$${prefix}/lib' \
-		--with-dynmodules="$(backends)" \
+		--with-dynmodules="$(backends_dyn)" \
 		--with-modules="" \
 		--with-pgsql-includes=`pg_config --includedir` \
 		--with-mysql-lib=/usr/lib/$(DEB_HOST_MULTIARCH) \
 		--with-boost=/usr \
 		--enable-cryptopp \
 		--disable-recursor
+	mkdir build-sta && \
+	cp -a pdns modules config* Makefile* build-sta
 	dh_auto_configure $(OOT)-sta -- \
 		--host=$(DEB_HOST_GNU_TYPE) \
 		--build=$(DEB_BUILD_GNU_TYPE) \
@@ -41,7 +47,7 @@ override_dh_auto_configure:
 		--libdir='$${prefix}/lib/powerdns' \
 		--libexecdir='$${prefix}/lib' \
 		--with-dynmodules="" \
-		--with-modules="$(backends)" \
+		--with-modules="$(backends_sta)" \
 		--with-pgsql-includes=`pg_config --includedir` \
 		--with-mysql-lib=/usr/lib/$(DEB_HOST_MULTIARCH) \
 		--with-boost=/usr \
@@ -60,6 +66,10 @@ override_dh_auto_install:
 override_dh_install:
         dh_install -p$(PACKAGE)        --sourcedir=debian/tmp-dyn
         dh_install -p$(PACKAGE)-static --sourcedir=debian/tmp-sta
+
+override_dh_auto_clean:
+	rm -rf build-dyn build-sta
+	dh_auto_clean
 
 # pdns-server has a debug package
 override_dh_strip:
