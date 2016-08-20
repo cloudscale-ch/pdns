@@ -5,6 +5,10 @@
     it under the terms of the GNU General Public License version 2 as published 
     by the Free Software Foundation
 
+    Additionally, the license of this program contains a special
+    exception which allows to distribute the program in binary form when
+    it is linked against OpenSSL.
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -15,6 +19,9 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "luabackend.hh"
 
 #include "pdns/logger.hh"
@@ -103,15 +110,11 @@ void LUABackend::dnsrr_to_table(lua_State *lua, const DNSResourceRecord *rr) {
     lua_settable(lua, -3);
     
     lua_pushliteral(lua, "qclass");
-    lua_pushnumber(lua, rr->qclass);
-    lua_settable(lua, -3);
-    
-    lua_pushliteral(lua, "priority");
-    lua_pushnumber(lua, rr->priority);
+    lua_pushinteger(lua, rr->qclass);
     lua_settable(lua, -3);
 
     lua_pushliteral(lua, "ttl");
-    lua_pushnumber(lua, rr->ttl);
+    lua_pushinteger(lua, rr->ttl);
     lua_settable(lua, -3);
 
     lua_pushliteral(lua, "auth");

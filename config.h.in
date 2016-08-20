@@ -1,16 +1,19 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Set to the user and host that builds PowerDNS */
+#undef BUILD_HOST
+
+/* Define to 1 if you want to enable GSS-TSIG support */
+#undef ENABLE_GSS_TSIG
+
 /* Skip gcc locking */
 #undef GCC_SKIP_LOCKING
 
 /* Defined if the requested minimum BOOST version is satisfied */
 #undef HAVE_BOOST
 
-/* Define to 1 if you have <boost/archive/text_oarchive.hpp> */
-#undef HAVE_BOOST_ARCHIVE_TEXT_OARCHIVE_HPP
-
-/* Define to 1 if you have <boost/foreach.hpp> */
-#undef HAVE_BOOST_FOREACH_HPP
+/* Defined if the Boost program_options library is available */
+#undef HAVE_BOOST_PROGRAM_OPTIONS
 
 /* Define to 1 if you have <boost/program_options.hpp> */
 #undef HAVE_BOOST_PROGRAM_OPTIONS_HPP
@@ -18,26 +21,34 @@
 /* Define to 1 if you have <boost/test/unit_test.hpp> */
 #undef HAVE_BOOST_TEST_UNIT_TEST_HPP
 
-/* Define to 1 if you have botan 1.10 */
-#undef HAVE_BOTAN110
+/* Defined if the Boost unit_test_framework library is available */
+#undef HAVE_BOOST_UNIT_TEST_FRAMEWORK
 
 /* Define to 1 if you have botan 1.10 */
-#undef HAVE_BOTAN18
+#undef HAVE_BOTAN110
 
 /* Define to 1 if you have the <cdb.h> header file. */
 #undef HAVE_CDB_H
 
-/* Define to 1 if you have crypto++ */
-#undef HAVE_CRYPTOPP
+/* Define to 1 if you have clock_gettime */
+#undef HAVE_CLOCK_GETTIME
+
+/* define if the compiler supports basic C++11 syntax */
+#undef HAVE_CXX11
+
+/* Define to 1 if you have the declaration of `NID_secp384r1', and to 0 if you
+   don't. */
+#undef HAVE_DECL_NID_SECP384R1
+
+/* Define to 1 if you have the declaration of `NID_X9_62_prime256v1', and to 0
+   if you don't. */
+#undef HAVE_DECL_NID_X9_62_PRIME256V1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
-
-/* If the host operating system understands IPv6 */
-#undef HAVE_IPV6
 
 /* Define to 1 if you have the <lber.h> header file. */
 #undef HAVE_LBER_H
@@ -51,11 +62,8 @@
 /* Define to 1 if you have ldap_sasl_bind */
 #undef HAVE_LDAP_SASL_BIND
 
-/* Define to 1 if you have the `crypt' library (-lcrypt). */
-#undef HAVE_LIBCRYPT
-
-/* Define to 1 if you have the `dl' library (-ldl). */
-#undef HAVE_LIBDL
+/* define to 1 if OpenSSL ecdsa support is avalable. */
+#undef HAVE_LIBCRYPTO_ECDSA
 
 /* Have -lldap */
 #undef HAVE_LIBLDAP
@@ -63,26 +71,17 @@
 /* Have -lldap_r */
 #undef HAVE_LIBLDAP_R
 
-/* Have -llmdb */
-#undef HAVE_LIBLMDB
-
-/* Have -lopendbx */
-#undef HAVE_LIBOPENDBX
+/* Define to 1 if you have libsodium */
+#undef HAVE_LIBSODIUM
 
 /* Define to 1 if you have libzmq */
 #undef HAVE_LIBZMQ
 
-/* Define to 1 if you have the <lmdb.h> header file. */
-#undef HAVE_LMDB_H
-
 /* Define to 1 if you have the `localtime_r' function. */
 #undef HAVE_LOCALTIME_R
 
-/* liblua */
+/* Define to 1 if you have lua */
 #undef HAVE_LUA
-
-/* lua.h */
-#undef HAVE_LUA_H
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
@@ -99,7 +98,13 @@
 /* Define to 1 if you have 0.20 or newer P11-kit */
 #undef HAVE_P11KIT1_V2
 
-/* If we have sqlite3 */
+/* Define if using protobuf. */
+#undef HAVE_PROTOBUF
+
+/* Define to 1 if you have the `recvmmsg' function. */
+#undef HAVE_RECVMMSG
+
+/* Define to 1 if you have sqlite3 */
 #undef HAVE_SQLITE3
 
 /* Define to 1 if you have the <stdint.h> header file. */
@@ -116,6 +121,9 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
+
+/* Systemd available and enabled */
+#undef HAVE_SYSTEMD
 
 /* Define to 1 if you have the <sys/mman.h> header file. */
 #undef HAVE_SYS_MMAN_H
@@ -139,20 +147,20 @@
    */
 #undef LT_OBJDIR
 
+/* Define to 1 if you want to benefit from malloc trace */
+#undef MALLOC_TRACE
+
 /* If your OS is so broken that it needs an additional prototype */
 #undef NEED_INET_NTOP_PROTO
 
 /* If POSIX typedefs need to be defined */
 #undef NEED_POSIX_TYPEDEF
 
-/* If host OS misses RTLD_NOW */
-#undef NEED_RTLD_NOW
-
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#undef NO_MINUS_C_MINUS_O
-
 /* Name of package */
 #undef PACKAGE
+
+/* Set to the package version used for secpoll */
+#undef PACKAGEVERSION
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -172,11 +180,17 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* pdns configure arguments */
+#undef PDNS_CONFIG_ARGS
+
 /* Built-in modules */
 #undef PDNS_MODULES
 
 /* Define to 1 if you have the ZeroMQ connector */
 #undef REMOTEBACKEND_ZEROMQ
+
+/* Define to 1 for reproducible builds */
+#undef REPRODUCIBLE
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
@@ -194,5 +208,5 @@
    `char[]'. */
 #undef YYTEXT_POINTER
 
-/* Define to `unsigned int' if <sys/types.h> does not define. */
-#undef size_t
+/* Define _GNU_SOURCE so that we get all necessary prototypes */
+#undef _GNU_SOURCE

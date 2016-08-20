@@ -19,12 +19,13 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#ifndef PDNS_WSAPI_HH
+#define PDNS_WSAPI_HH
+
 #include <map>
-#include "rapidjson/document.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
 #include "webserver.hh"
 
+void apiDiscovery(HttpRequest* req, HttpResponse* resp);
 void apiServer(HttpRequest* req, HttpResponse* resp);
 void apiServerDetail(HttpRequest* req, HttpResponse* resp);
 void apiServerConfig(HttpRequest* req, HttpResponse* resp);
@@ -32,8 +33,13 @@ void apiServerSearchLog(HttpRequest* req, HttpResponse* resp);
 void apiServerStatistics(HttpRequest* req, HttpResponse* resp);
 
 // helpers
-string apiZoneIdToName(const string& id);
-string apiZoneNameToId(const string& name);
+DNSName apiZoneIdToName(const string& id);
+string apiZoneNameToId(const DNSName& name);
+void apiCheckNameAllowedCharacters(const string& name);
+void apiCheckQNameAllowedCharacters(const string& name);
+DNSName apiNameToDNSName(const string& name);
 
 // To be provided by product code.
 void productServerStatisticsFetch(std::map<string,string>& out);
+
+#endif /* PDNS_WSAPI_HH */

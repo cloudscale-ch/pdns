@@ -44,6 +44,7 @@ extern CommunicatorClass Communicator;
 extern UDPNameserver *N;
 extern int avg_latency;
 extern TCPNameserver *TN;
+extern AuthLua *LPE;
 extern ArgvMap & arg( void );
 extern void declareArguments();
 extern void declareStats();
@@ -51,5 +52,6 @@ extern void mainthread();
 extern int isGuarded( char ** );
 void* carbonDumpThread(void*);
 extern bool g_anyToTcp;
+extern bool g_8bitDNS;
 
 #endif // COMMON_STARTUP_HH

@@ -19,6 +19,9 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "packetcache.hh"
 #include "utility.hh"
 #include "dynhandler.hh"
@@ -33,6 +36,7 @@
 #include "nameserver.hh"
 #include "responsestats.hh"
 #include "ueberbackend.hh"
+#include "common_startup.hh"
 
 extern ResponseStats g_rs;
 
@@ -57,7 +61,7 @@ string DLQuitHandler(const vector<string>&parts, Utility::pid_t ppid)
 
 static void dokill(int)
 {
-  exit(1);
+  exit(0);
 }
 
 string DLCurrentConfigHandler(const vector<string>&parts, Utility::pid_t ppid)
@@ -125,7 +129,10 @@ string DLPurgeHandler(const vector<string>&parts, Utility::pid_t ppid)
   if(parts.size()>1) {
     for (vector<string>::const_iterator i=++parts.begin();i<parts.end();++i) {
       ret+=PC.purge(*i);
-      dk.clearCaches(*i);
+      if(!boost::ends_with(*i, "$"))
+	dk.clearCaches(DNSName(*i));
+      else
+	dk.clearAllCaches(); // at least we do what we promise.. and a bit more!
     }
   }
   else {
@@ -176,7 +183,7 @@ string DLRSizesHandler(const vector<string>&parts, Utility::pid_t ppid)
   respsizes_t respsizes = g_rs.getSizeResponseCounts();
   ostringstream os;
   boost::format fmt("%d\t%d\n");
-  BOOST_FOREACH(const respsizes_t::value_type& val, respsizes) {
+  for(const respsizes_t::value_type& val :  respsizes) {
     os << (fmt % val.first % val.second).str();
   }
   return os.str();
@@ -189,7 +196,7 @@ string DLRemotesHandler(const vector<string>&parts, Utility::pid_t ppid)
   totals_t totals = S.getRing("remotes");
   string ret;
   boost::format fmt("%s\t%d\n");
-  BOOST_FOREACH(totals_t::value_type& val, totals) {
+  for(totals_t::value_type& val :  totals) {
     ret += (fmt % val.first % val.second).str();
   }
   return ret;
@@ -228,18 +235,24 @@ string DLNotifyRetrieveHandler(const vector<string>&parts, Utility::pid_t ppid)
   if(parts.size()!=2)
     return "syntax: retrieve domain";
 
-  const string& domain=parts[1];
+  DNSName domain;
+  try {
+    domain = DNSName(parts[1]);
+  } catch (...) {
+    return "Failed to parse domain as valid DNS name";
+  }
+
   DomainInfo di;
   UeberBackend B;
   if(!B.getDomainInfo(domain, di))
-    return "Domain '"+domain+"' unknown";
+    return "Domain '"+domain.toString()+"' unknown";
   
   if(di.masters.empty())
-    return "Domain '"+domain+"' is not a slave domain (or has no master defined)";
+    return "Domain '"+domain.toString()+"' is not a slave domain (or has no master defined)";
 
   random_shuffle(di.masters.begin(), di.masters.end());
-  Communicator.addSuckRequest(domain, di.masters.front());
-  return "Added retrieval request for '"+domain+"' from master "+di.masters.front();
+  Communicator.addSuckRequest(domain, di.masters.front()); 
+  return "Added retrieval request for '"+domain.toString()+"' from master "+di.masters.front();
 }
 
 string DLNotifyHostHandler(const vector<string>&parts, Utility::pid_t ppid)
@@ -248,8 +261,15 @@ string DLNotifyHostHandler(const vector<string>&parts, Utility::pid_t ppid)
   ostringstream os;
   if(parts.size()!=3)
     return "syntax: notify-host domain ip";
-  if(!::arg().mustDo("master"))
-      return "PowerDNS not configured as master";
+  if(!::arg().mustDo("master") && !::arg().mustDo("slave-renotify"))
+      return "PowerDNS not configured as master or slave with re-notifications";
+
+  DNSName domain;
+  try {
+    domain = DNSName(parts[1]);
+  } catch (...) {
+    return "Failed to parse domain as valid DNS name";
+  }
 
   try {
     ComboAddress ca(parts[2]);
@@ -258,8 +278,8 @@ string DLNotifyHostHandler(const vector<string>&parts, Utility::pid_t ppid)
     return "Unable to convert '"+parts[2]+"' to an IP address";
   }
   
-  L<<Logger::Warning<<"Notification request to host "<<parts[2]<<" for domain '"<<parts[1]<<"' received"<<endl;
-  Communicator.notify(parts[1],parts[2]);
+  L<<Logger::Warning<<"Notification request to host "<<parts[2]<<" for domain '"<<domain<<"' received from operator"<<endl;
+  Communicator.notify(domain, parts[2]);
   return "Added to queue";
 }
 
@@ -269,8 +289,8 @@ string DLNotifyHandler(const vector<string>&parts, Utility::pid_t ppid)
   UeberBackend B;
   if(parts.size()!=2)
     return "syntax: notify domain";
-  if(!::arg().mustDo("master"))
-      return "PowerDNS not configured as master";
+  if(!::arg().mustDo("master") && !::arg().mustDo("slave-renotify"))
+      return "PowerDNS not configured as master or slave with re-notifications";
   L<<Logger::Warning<<"Notification request for domain '"<<parts[1]<<"' received from operator"<<endl;
 
   if (parts[1] == "*") {
@@ -291,7 +311,13 @@ string DLNotifyHandler(const vector<string>&parts, Utility::pid_t ppid)
       return itoa(notified)+" out of "+itoa(total)+" zones added to queue - see log";
     return "Added "+itoa(total)+" MASTER zones to queue";
   } else {
-    if(!Communicator.notifyDomain(parts[1]))
+    DNSName domain;
+    try {
+      domain = DNSName(parts[1]);
+    } catch (...) {
+      return "Failed to parse domain as valid DNS name";
+    }
+    if(!Communicator.notifyDomain(DNSName(parts[1])))
       return "Failed to add to the queue - see log";
     return "Added to queue";
   }
@@ -320,6 +346,7 @@ string DLReloadHandler(const vector<string>&parts, Utility::pid_t ppid)
   return "Ok";
 }
 
+
 string DLListZones(const vector<string>&parts, Utility::pid_t ppid)
 {
   UeberBackend B;
@@ -341,7 +368,7 @@ string DLListZones(const vector<string>&parts, Utility::pid_t ppid)
 
   for (vector<DomainInfo>::const_iterator di=domains.begin(); di != domains.end(); di++) {
     if (di->kind == kindFilter || kindFilter == -1) {
-      ret<<di->zone<<endl;
+      ret<<di->zone.toString()<<endl;
       count++;
     }
   }
@@ -351,4 +378,35 @@ string DLListZones(const vector<string>&parts, Utility::pid_t ppid)
     ret<<"All zonecount:"<<count;
 
   return ret.str();
+}
+
+string DLPolicy(const vector<string>&parts, Utility::pid_t ppid)
+{
+  if(LPE) {
+    return LPE->policycmd(parts);
+  }
+  else {
+    return "no policy script loaded";
+  }
+}
+
+#ifdef HAVE_P11KIT1
+extern bool PKCS11ModuleSlotLogin(const std::string& module, const string& tokenId, const std::string& pin);
+#endif
+
+string DLTokenLogin(const vector<string>&parts, Utility::pid_t ppid)
+{
+#ifndef HAVE_P11KIT1
+  return "PKCS#11 support not compiled in";
+#else
+  if (parts.size() != 4) {
+    return "invalid number of parameters, needs 4, got " + std::to_string(parts.size());
+  }
+
+  if (PKCS11ModuleSlotLogin(parts[1], parts[2], parts[3])) {
+    return "logged in";
+  } else {
+    return "could not log in, check logs";
+  }
+#endif
 }

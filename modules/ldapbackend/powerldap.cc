@@ -1,5 +1,8 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "powerldap.hh"
-#include <pdns/misc.hh>
+#include "pdns/misc.hh"
 #include <sys/time.h>
 
 
@@ -264,13 +267,24 @@ const string PowerLDAP::escape( const string& str )
 {
         string a;
         string::const_iterator i;
+        char tmp[4];
 
         for( i = str.begin(); i != str.end(); i++ )
         {
-        	if( *i == '*' || *i == '\\' ) {
-        		a += '\\';
-        	}
-        	a += *i;
+            // RFC4515 3
+            if( *i == '*' ||
+                *i == '(' ||
+                *i == ')' ||
+                *i == '\\' ||
+                *i == '\0' ||
+                *i > 127)
+            {
+                sprintf(tmp,"\\%02x", (unsigned char)*i);
+
+                a += tmp;
+            }
+            else
+                a += *i;
         }
 
         return a;

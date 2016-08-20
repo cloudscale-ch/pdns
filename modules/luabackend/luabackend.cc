@@ -5,6 +5,10 @@
     it under the terms of the GNU General Public License version 2 as published 
     by the Free Software Foundation
 
+    Additionally, the license of this program contains a special
+    exception which allows to distribute the program in binary form when
+    it is linked against OpenSSL.
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -15,6 +19,9 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "luabackend.hh"
 #include "pdns/logger.hh"
 
@@ -49,7 +56,11 @@ public:
   {
     BackendMakers().report(new LUAFactory);
     
-    L << Logger::Info << "[luabackend] This is the lua backend version " VERSION " (" __DATE__ ", " __TIME__ ") reporting" << endl;
+    L << Logger::Info << "[luabackend] This is the lua backend version " VERSION
+#ifndef REPRODUCIBLE
+      << " (" __DATE__ " " __TIME__ ")"
+#endif
+      << " reporting" << endl;
   }  
 };
 

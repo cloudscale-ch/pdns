@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include <bitset>
 #include "statbag.hh"
 #include "dnspcap.hh"
@@ -22,6 +25,10 @@ using namespace ::boost::multi_index;
 #include "namespaces.hh"
 StatBag S;
 
+void usage() {
+  cerr<<"syntax: dnsscan INFILE ..."<<endl;
+}
+
 int main(int argc, char** argv)
 try
 {
@@ -34,8 +41,20 @@ try
   */
 
   if(argc<2) {
-    cerr<<"Syntax: dnsscan file1 [file2 ..] "<<endl;
-    exit(1);
+    usage();
+    exit(EXIT_SUCCESS);
+  }
+
+  for(int n=1; n < argc; ++n) {
+    if ((string) argv[n] == "--help") {
+      usage();
+      return EXIT_SUCCESS;
+    }
+
+    if ((string) argv[n] == "--version") {
+      cerr<<"dnsscan "<<VERSION<<endl;
+      return EXIT_SUCCESS;
+    }
   }
 
   unsigned int counts[256];
@@ -51,23 +70,9 @@ try
         if(mdp.d_qtype < 256)
           counts[mdp.d_qtype]++;
 
-        for(unsigned int i=0; i < mdp.d_qname.length(); ++i)
-          if(!isalnum(mdp.d_qname[i]) && mdp.d_qname[i]!='.' && mdp.d_qname[i]!='-' && mdp.d_qname[i]!='_') {
-            //          cout<<mdp.d_qname<<"|"<<mdp.d_qtype<<"|"<<mdp.d_qclass<<"\n";
-            // sock.sendTo(string(pr.d_payload, pr.d_payload + pr.d_len), remote);
-            break;
-          }
-        if(mdp.d_qtype > 256 || mdp.d_qclass!=1 ) {
-          //        sock.sendTo(string(pr.d_payload, pr.d_payload + pr.d_len), remote);
-          
-        }
-        for(MOADNSParser::answers_t::const_iterator i=mdp.d_answers.begin(); i!=mdp.d_answers.end(); ++i) {          
-          
-        }
-        
       }
       catch(MOADNSException &e) {
-        cout<<"Error from remote "<<U32ToIP(ntohl(*((uint32_t*)&pr.d_ip->ip_src)))<<": "<<e.what()<<"\n";
+        cout<<"Error from remote "<<pr.getSource().toString()<<": "<<e.what()<<"\n";
         //        sock.sendTo(string(pr.d_payload, pr.d_payload + pr.d_len), remote);
       }
     }

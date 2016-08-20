@@ -26,9 +26,7 @@
 #include <list>
 #include <boost/utility.hpp>
 #include <yahttp/yahttp.hpp>
-#include "rapidjson/document.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
+#include "json11.hpp"
 #include "namespaces.hh"
 #include "sstuff.hh"
 
@@ -41,7 +39,7 @@ public:
   bool accept_json;
   bool accept_html;
   bool complete;
-  void json(rapidjson::Document& document);
+  json11::Json json();
 
   // checks password _only_.
   bool compareAuthorization(const string &expected_password);
@@ -53,7 +51,9 @@ public:
   HttpResponse() : YaHTTP::Response() { };
   HttpResponse(const YaHTTP::Response &resp) : YaHTTP::Response(resp) { };
 
-  void setBody(rapidjson::Document& document);
+  void setBody(const json11::Json& document);
+  void setErrorResult(const std::string& message, const int status);
+  void setSuccessResult(const std::string& message, const int status = 200);
 };
 
 
@@ -81,10 +81,15 @@ public:
 
 class HttpUnauthorizedException : public HttpException {
 public:
-  HttpUnauthorizedException() : HttpException(401)
+  HttpUnauthorizedException(string const &scheme) : HttpException(401)
   {
-    d_response.headers["WWW-Authenticate"] = "Basic realm=\"PowerDNS\"";
+    d_response.headers["WWW-Authenticate"] = scheme + " realm=\"PowerDNS\"";
   }
+};
+
+class HttpForbiddenException : public HttpException {
+public:
+  HttpForbiddenException() : HttpException(403) { };
 };
 
 class HttpNotFoundException : public HttpException {
@@ -136,15 +141,13 @@ public:
   void go();
 
   void serveConnection(Socket *client);
-  HttpResponse handleRequest(HttpRequest request);
+  void handleRequest(HttpRequest& request, HttpResponse& resp);
 
   typedef boost::function<void(HttpRequest* req, HttpResponse* resp)> HandlerFunction;
   void registerApiHandler(const string& url, HandlerFunction handler);
   void registerWebHandler(const string& url, HandlerFunction handler);
 
 protected:
-  static char B64Decode1(char cInChar);
-  static int B64Decode(const std::string& strInput, std::string& strOutput);
   void registerBareHandler(const string& url, HandlerFunction handler);
 
   virtual Server* createServer() {

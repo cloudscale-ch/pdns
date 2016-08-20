@@ -19,6 +19,9 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "packetcache.hh"
 #include "utility.hh"
 #include <errno.h>
@@ -33,10 +36,8 @@
 #include "dns.hh"
 #include "arguments.hh"
 #include "packetcache.hh"
-#include <boost/lexical_cast.hpp>
 
-// #include "namespaces.hh"
-
+// there can be MANY OF THESE
 void CommunicatorClass::retrievalLoopThread(void)
 {
   for(;;) {
@@ -50,7 +51,7 @@ void CommunicatorClass::retrievalLoopThread(void)
       sr=d_suckdomains.front();
       d_suckdomains.pop_front();
     }
-    suck(sr.domain,sr.master);
+    suck(sr.domain, sr.master);
   }
 }
 
@@ -76,7 +77,7 @@ void CommunicatorClass::go()
   }
   catch(PDNSException &e) {
     L<<Logger::Error<<"Unparseable IP in only-notify. Error: "<<e.reason<<endl;
-    exit(0);
+    exit(1);
   }
 
   vector<string> parts;
@@ -88,7 +89,7 @@ void CommunicatorClass::go()
     }
     catch(PDNSException &e) {
       L<<Logger::Error<<"Unparseable IP in also-notify. Error: "<<e.reason<<endl;
-      exit(0);
+      exit(1);
     }
   }
 }
@@ -130,16 +131,16 @@ void CommunicatorClass::mainloop(void)
   catch(PDNSException &ae) {
     L<<Logger::Error<<"Exiting because communicator thread died with error: "<<ae.reason<<endl;
     Utility::sleep(1);
-    exit(0);
+    exit(1);
   }
   catch(std::exception &e) {
     L<<Logger::Error<<"Exiting because communicator thread died with STL error: "<<e.what()<<endl;
-    exit(0);
+    exit(1);
   }
   catch( ... )
   {
     L << Logger::Error << "Exiting because communicator caught unknown exception." << endl;
-    exit( 0 );
+    exit(1);
   }
 }
 

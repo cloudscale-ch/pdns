@@ -5,6 +5,10 @@
     it under the terms of the GNU General Public License version 2 as published 
     by the Free Software Foundation
 
+    Additionally, the license of this program contains a special
+    exception which allows to distribute the program in binary form when
+    it is linked against OpenSSL.
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -16,13 +20,16 @@
 */
 
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "luabackend.hh"
 
 #include "pdns/logger.hh"
 #include "pdns/arguments.hh"
 
-/* 
- //! determine if ip is a supermaster or a domain
+/*
+  //! determine if ip is a supermaster for a domain
   virtual bool superMasterBackend(const string &ip, const string &domain, const vector<DNSResourceRecord>&nsset, string *nameserver, string *account, DNSBackend **db)
 
   //! called by PowerDNS to create a slave record for a superMaster
@@ -30,7 +37,7 @@
 
 */
 
-bool LUABackend::superMasterBackend(const string &ip, const string &domain, const vector<DNSResourceRecord>&nsset, string *nameserver, string *account, DNSBackend **db) {
+bool LUABackend::superMasterBackend(const string &ip, const DNSName &domain, const vector<DNSResourceRecord>&nsset, string *nameserver, string *account, DNSBackend **db) {
 	
     if (f_lua_supermasterbackend == 0)
         return false;
@@ -41,20 +48,19 @@ bool LUABackend::superMasterBackend(const string &ip, const string &domain, cons
     lua_rawgeti(lua, LUA_REGISTRYINDEX, f_lua_supermasterbackend);
 
     lua_pushstring(lua, ip.c_str());
-    lua_pushstring(lua, domain.c_str());
+    lua_pushstring(lua, domain.toString().c_str());
     
     
     lua_newtable(lua);
     int c = 0;
     for(vector<DNSResourceRecord>::const_iterator i=nsset.begin();i!=nsset.end();++i) {
 	c++;
-	lua_pushnumber(lua, c);
+	lua_pushinteger(lua, c);
 	
 	DNSResourceRecord rr;
 	
 	rr.qtype = i->qtype;
 	rr.qclass = i->qclass;
-	rr.priority = i->priority;
 	rr.ttl = i->ttl;
 	rr.auth = i->auth;
 	rr.content = i->content;
@@ -96,7 +102,7 @@ bool LUABackend::superMasterBackend(const string &ip, const string &domain, cons
     return ok;
 }
 
-bool LUABackend::createSlaveDomain(const string &ip, const string &domain, const string &nameserver, const string &account) {
+bool LUABackend::createSlaveDomain(const string &ip, const DNSName& domain, const string &nameserver, const string &account) {
 	
     if (f_lua_createslavedomain == 0)
         return false;
@@ -107,7 +113,7 @@ bool LUABackend::createSlaveDomain(const string &ip, const string &domain, const
     lua_rawgeti(lua, LUA_REGISTRYINDEX, f_lua_createslavedomain);
 
     lua_pushstring(lua, ip.c_str());
-    lua_pushstring(lua, domain.c_str());
+    lua_pushstring(lua, domain.toString().c_str());
     lua_pushstring(lua, account.c_str());
 
     if(lua_pcall(lua, 3, 1, f_lua_exec_error) != 0) {

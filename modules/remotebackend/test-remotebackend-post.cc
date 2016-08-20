@@ -1,14 +1,14 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "pdns/namespaces.hh"
-#include <pdns/dns.hh>
-#include <pdns/dnsbackend.hh>
-#include <pdns/dnspacket.hh>
-#include <pdns/ueberbackend.hh>
-#include <pdns/pdnsexception.hh>
-#include <pdns/logger.hh>
-#include <pdns/arguments.hh>
-#include <boost/lexical_cast.hpp>
-#include <rapidjson/rapidjson.h>
-#include <rapidjson/document.h>
+#include "pdns/dns.hh"
+#include "pdns/dnsbackend.hh"
+#include "pdns/dnspacket.hh"
+#include "pdns/ueberbackend.hh"
+#include "pdns/pdnsexception.hh"
+#include "pdns/logger.hh"
+#include "pdns/arguments.hh"
 #include "pdns/json.hh"
 #include "pdns/statbag.hh"
 #include "pdns/packetcache.hh"
@@ -35,7 +35,7 @@ DNSBackend *be;
 
 #include <boost/test/unit_test.hpp>
 #include <boost/assign/list_of.hpp>
-#include <boost/foreach.hpp>
+
 #include <boost/tuple/tuple.hpp>
 
 struct RemotebackendSetup {

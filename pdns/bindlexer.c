@@ -8,7 +8,7 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
-#define YY_FLEX_SUBMINOR_VERSION 35
+#define YY_FLEX_SUBMINOR_VERSION 39
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
@@ -161,7 +161,12 @@ typedef unsigned int flex_uint32_t;
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
-extern int yyleng;
+#ifndef YY_TYPEDEF_YY_SIZE_T
+#define YY_TYPEDEF_YY_SIZE_T
+typedef size_t yy_size_t;
+#endif
+
+extern yy_size_t yyleng;
 
 extern FILE *yyin, *yyout;
 
@@ -170,6 +175,7 @@ extern FILE *yyin, *yyout;
 #define EOB_ACT_LAST_MATCH 2
 
     #define YY_LESS_LINENO(n)
+    #define YY_LINENO_REWIND_TO(ptr)
     
 /* Return all but the first "n" matched characters back to the input stream. */
 #define yyless(n) \
@@ -186,11 +192,6 @@ extern FILE *yyin, *yyout;
 	while ( 0 )
 
 #define unput(c) yyunput( c, (yytext_ptr)  )
-
-#ifndef YY_TYPEDEF_YY_SIZE_T
-#define YY_TYPEDEF_YY_SIZE_T
-typedef size_t yy_size_t;
-#endif
 
 #ifndef YY_STRUCT_YY_BUFFER_STATE
 #define YY_STRUCT_YY_BUFFER_STATE
@@ -209,7 +210,7 @@ struct yy_buffer_state
 	/* Number of characters read into yy_ch_buf, not including EOB
 	 * characters.
 	 */
-	int yy_n_chars;
+	yy_size_t yy_n_chars;
 
 	/* Whether we "own" the buffer - i.e., we know we created it,
 	 * and can realloc() it to grow it, and should free() it to
@@ -279,8 +280,8 @@ static YY_BUFFER_STATE * yy_buffer_stack = 0; /**< Stack as an array. */
 
 /* yy_hold_char holds the character lost when yytext is formed. */
 static char yy_hold_char;
-static int yy_n_chars;		/* number of characters read into yy_ch_buf */
-int yyleng;
+static yy_size_t yy_n_chars;		/* number of characters read into yy_ch_buf */
+yy_size_t yyleng;
 
 /* Points to current character in buffer. */
 static char *yy_c_buf_p = (char *) 0;
@@ -308,7 +309,7 @@ static void yy_init_buffer (YY_BUFFER_STATE b,FILE *file  );
 
 YY_BUFFER_STATE yy_scan_buffer (char *base,yy_size_t size  );
 YY_BUFFER_STATE yy_scan_string (yyconst char *yy_str  );
-YY_BUFFER_STATE yy_scan_bytes (yyconst char *bytes,int len  );
+YY_BUFFER_STATE yy_scan_bytes (yyconst char *bytes,yy_size_t len  );
 
 void *yyalloc (yy_size_t  );
 void *yyrealloc (void *,yy_size_t  );
@@ -590,7 +591,7 @@ extern const char *bind_directory;
 
 
 #define YY_NO_INPUT 1
-#line 594 "bindlexer.c"
+#line 595 "bindlexer.c"
 
 #define INITIAL 0
 #define comment 1
@@ -632,7 +633,7 @@ FILE *yyget_out (void );
 
 void yyset_out  (FILE * out_str  );
 
-int yyget_leng (void );
+yy_size_t yyget_leng (void );
 
 char *yyget_text (void );
 
@@ -786,12 +787,6 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 32 "bindlexer.l"
-
-
-
-#line 794 "bindlexer.c"
-
 	if ( !(yy_init) )
 		{
 		(yy_init) = 1;
@@ -818,6 +813,13 @@ YY_DECL
 		yy_load_buffer_state( );
 		}
 
+	{
+#line 32 "bindlexer.l"
+
+
+
+#line 822 "bindlexer.c"
+
 	while ( 1 )		/* loops until end-of-file is reached */
 		{
 		yy_cp = (yy_c_buf_p);
@@ -834,7 +836,7 @@ YY_DECL
 yy_match:
 		do
 			{
-			register YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)];
+			register YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)] ;
 			if ( yy_accept[yy_current_state] )
 				{
 				(yy_last_accepting_state) = yy_current_state;
@@ -916,9 +918,14 @@ YY_RULE_SETUP
 	char filename[1024];
         if ( include_stack_ptr >= MAX_INCLUDE_DEPTH )
             {
-            fprintf( stderr, "Includes nested too deeply" );
+            fprintf( stderr, "Includes nested too deeply\n" );
             exit( 1 );
             }
+
+        if (strlen(yytext) <= 2) {
+            fprintf( stderr, "Empty include directive\n" );
+            exit( 1 );
+        }
 
         yytext[strlen(yytext)-2]=0;
 
@@ -926,15 +933,28 @@ YY_RULE_SETUP
         include_stack_name[include_stack_ptr]=current_filename=strdup(yytext+1);
         include_stack_ln[include_stack_ptr++]=linenumber;
         linenumber=1;
-	if(*(yytext+1)=='/')
+
+	if(*(yytext+1)=='/') {
+                if (strlen(yytext+1) >= sizeof(filename)) {
+		  fprintf( stderr, "Filename '%s' is too long\n",yytext+1);
+		  exit( 1 );
+		}
 		strcpy(filename,yytext+1);
+	}
 	else {
+		size_t bind_directory_len = strlen(bind_directory);
+		if (bind_directory_len >= sizeof(filename) ||
+		    strlen(yytext+1) + 2 >= sizeof(filename) - bind_directory_len) {
+		  fprintf( stderr, "Filename '%s' is too long\n",yytext+1);
+		  exit( 1 );
+		}
 		strcpy(filename,bind_directory);
 		strcat(filename,"/");
 		strcat(filename,yytext+1);
 	}
+	filename[sizeof(filename)-1]='\0';
 
-        if (*yytext &&!(yyin=fopen(filename,"r"))) {
+	if (!(yyin=fopen(filename,"r"))) {
 	  fprintf( stderr, "Unable to open '%s': %s\n",filename,strerror(errno));
 	  exit( 1 );
 	}
@@ -948,7 +968,7 @@ case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(comment):
 case YY_STATE_EOF(incl):
 case YY_STATE_EOF(quoted):
-#line 76 "bindlexer.l"
+#line 94 "bindlexer.l"
 {
         if ( --include_stack_ptr < 0 )
         {
@@ -971,94 +991,94 @@ case YY_STATE_EOF(quoted):
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 99 "bindlexer.l"
+#line 117 "bindlexer.l"
 return ZONETOK; 
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 101 "bindlexer.l"
+#line 119 "bindlexer.l"
 return FILETOK;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 102 "bindlexer.l"
+#line 120 "bindlexer.l"
 return OPTIONSTOK;
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 103 "bindlexer.l"
+#line 121 "bindlexer.l"
 return ALSONOTIFYTOK;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 104 "bindlexer.l"
+#line 122 "bindlexer.l"
 return ACLTOK;
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 105 "bindlexer.l"
+#line 123 "bindlexer.l"
 return LOGGINGTOK;
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 106 "bindlexer.l"
+#line 124 "bindlexer.l"
 return DIRECTORYTOK;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 107 "bindlexer.l"
+#line 125 "bindlexer.l"
 return MASTERTOK;
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 108 "bindlexer.l"
+#line 126 "bindlexer.l"
 return TYPETOK;
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 109 "bindlexer.l"
+#line 127 "bindlexer.l"
 yy_push_state(quoted);
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 110 "bindlexer.l"
+#line 128 "bindlexer.l"
 yylval=strdup(yytext); return QUOTEDWORD;
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 111 "bindlexer.l"
+#line 129 "bindlexer.l"
 yy_pop_state();
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 112 "bindlexer.l"
+#line 130 "bindlexer.l"
 yylval=strdup(yytext);return AWORD;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 113 "bindlexer.l"
+#line 131 "bindlexer.l"
 return OBRACE;
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 114 "bindlexer.l"
+#line 132 "bindlexer.l"
 return EBRACE;
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 115 "bindlexer.l"
+#line 133 "bindlexer.l"
 return SEMICOLON;
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 116 "bindlexer.l"
+#line 134 "bindlexer.l"
 linenumber++;
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 117 "bindlexer.l"
+#line 135 "bindlexer.l"
 ;
 	YY_BREAK
 case 27:
@@ -1066,7 +1086,7 @@ case 27:
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 118 "bindlexer.l"
+#line 136 "bindlexer.l"
 ;
 	YY_BREAK
 case 28:
@@ -1074,15 +1094,15 @@ case 28:
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 119 "bindlexer.l"
+#line 137 "bindlexer.l"
 ;
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 120 "bindlexer.l"
+#line 138 "bindlexer.l"
 ECHO;
 	YY_BREAK
-#line 1086 "bindlexer.c"
+#line 1106 "bindlexer.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -1211,6 +1231,7 @@ ECHO;
 			"fatal flex scanner internal error--no action found" );
 	} /* end of action switch */
 		} /* end of scanning one token */
+	} /* end of user's declarations */
 } /* end of yylex */
 
 /* yy_get_next_buffer - try to read in a new buffer
@@ -1266,21 +1287,21 @@ static int yy_get_next_buffer (void)
 
 	else
 		{
-			int num_to_read =
+			yy_size_t num_to_read =
 			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
 		while ( num_to_read <= 0 )
 			{ /* Not enough room in the buffer - grow it. */
 
 			/* just a shorter name for the current buffer */
-			YY_BUFFER_STATE b = YY_CURRENT_BUFFER;
+			YY_BUFFER_STATE b = YY_CURRENT_BUFFER_LVALUE;
 
 			int yy_c_buf_p_offset =
 				(int) ((yy_c_buf_p) - b->yy_ch_buf);
 
 			if ( b->yy_is_our_buffer )
 				{
-				int new_size = b->yy_buf_size * 2;
+				yy_size_t new_size = b->yy_buf_size * 2;
 
 				if ( new_size <= 0 )
 					b->yy_buf_size += b->yy_buf_size / 8;
@@ -1311,7 +1332,7 @@ static int yy_get_next_buffer (void)
 
 		/* Read in more data. */
 		YY_INPUT( (&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move]),
-			(yy_n_chars), (size_t) num_to_read );
+			(yy_n_chars), num_to_read );
 
 		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = (yy_n_chars);
 		}
@@ -1406,7 +1427,7 @@ static int yy_get_next_buffer (void)
 	yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 	yy_is_jam = (yy_current_state == 108);
 
-	return yy_is_jam ? 0 : yy_current_state;
+		return yy_is_jam ? 0 : yy_current_state;
 }
 
 #ifndef YY_NO_INPUT
@@ -1433,7 +1454,7 @@ static int yy_get_next_buffer (void)
 
 		else
 			{ /* need more input */
-			int offset = (yy_c_buf_p) - (yytext_ptr);
+			yy_size_t offset = (yy_c_buf_p) - (yytext_ptr);
 			++(yy_c_buf_p);
 
 			switch ( yy_get_next_buffer(  ) )
@@ -1593,10 +1614,6 @@ static void yy_load_buffer_state  (void)
 	yyfree((void *) b  );
 }
 
-#ifndef __cplusplus
-extern int isatty (int );
-#endif /* __cplusplus */
-    
 /* Initializes or reinitializes a buffer.
  * This function is sometimes called more than once on the same buffer,
  * such as during a yyrestart() or at EOF.
@@ -1709,7 +1726,7 @@ void yypop_buffer_state (void)
  */
 static void yyensure_buffer_stack (void)
 {
-	int num_to_alloc;
+	yy_size_t num_to_alloc;
     
 	if (!(yy_buffer_stack)) {
 
@@ -1806,12 +1823,12 @@ YY_BUFFER_STATE yy_scan_string (yyconst char * yystr )
  * 
  * @return the newly allocated buffer state object.
  */
-YY_BUFFER_STATE yy_scan_bytes  (yyconst char * yybytes, int  _yybytes_len )
+YY_BUFFER_STATE yy_scan_bytes  (yyconst char * yybytes, yy_size_t  _yybytes_len )
 {
 	YY_BUFFER_STATE b;
 	char *buf;
 	yy_size_t n;
-	int i;
+	yy_size_t i;
     
 	/* Get memory for full buffer, including space for trailing EOB's. */
 	n = _yybytes_len + 2;
@@ -1925,7 +1942,7 @@ FILE *yyget_out  (void)
 /** Get the length of the current token.
  * 
  */
-int yyget_leng  (void)
+yy_size_t yyget_leng  (void)
 {
         return yyleng;
 }
@@ -2081,7 +2098,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 120 "bindlexer.l"
+#line 137 "bindlexer.l"
 
 
 

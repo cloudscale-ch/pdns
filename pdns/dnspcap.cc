@@ -1,4 +1,7 @@
 #define __FAVOR_BSD
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "dnspcap.hh"
 #include <boost/format.hpp>
 #include <fcntl.h>
@@ -8,7 +11,7 @@ PcapPacketReader::PcapPacketReader(const string& fname) : d_fname(fname)
 {
   d_fp=fopen(fname.c_str(),"r");
   if(!d_fp)
-    unixDie("Unable to open file");
+    unixDie("Unable to open file " + fname);
   
   int flags=fcntl(fileno(d_fp),F_GETFL,0);
   fcntl(fileno(d_fp), F_SETFL,flags&(~O_NONBLOCK)); // bsd needs this in stdin (??)
@@ -20,7 +23,11 @@ PcapPacketReader::PcapPacketReader(const string& fname) : d_fname(fname)
   
   if( d_pfh.linktype==1) {
     d_skipMediaHeader=sizeof(struct ether_header);
-  } else if(d_pfh.linktype==113) {
+  }
+  else if(d_pfh.linktype==101) {
+    d_skipMediaHeader=0;
+  }
+  else if(d_pfh.linktype==113) {
     d_skipMediaHeader=16;
   }
   else throw runtime_error((format("Unsupported link type %d") % d_pfh.linktype).str());
@@ -77,6 +84,12 @@ try
     uint16_t contentCode=0;
     if(d_pfh.linktype==1) 
       contentCode=ntohs(d_ether->ether_type);
+    else if(d_pfh.linktype==101) {
+      if(d_ip->ip_v==4)
+	contentCode = 0x0800;
+      else
+	contentCode = 0x86dd;
+    }
     else if(d_pfh.linktype==113)
       contentCode=ntohs(d_lcc->lcc_protocol);
 
@@ -84,6 +97,10 @@ try
       d_udp=reinterpret_cast<const struct udphdr*>(d_buffer + d_skipMediaHeader + 4 * d_ip->ip_hl);
       d_payload = (unsigned char*)d_udp + sizeof(struct udphdr);
       d_len = ntohs(d_udp->uh_ulen) - sizeof(struct udphdr);
+      if((const char*)d_payload + d_len > d_buffer + d_pheader.caplen) {
+	d_runts++;
+	continue;
+      }
       d_correctpackets++;
       return true;
     }
@@ -91,6 +108,11 @@ try
       d_udp=reinterpret_cast<const struct udphdr*>(d_buffer + d_skipMediaHeader + sizeof(struct ip6_hdr));
       d_payload = (unsigned char*)d_udp + sizeof(struct udphdr);
       d_len = ntohs(d_udp->uh_ulen) - sizeof(struct udphdr);
+      if((const char*)d_payload + d_len > d_buffer + d_pheader.caplen) {
+	d_runts++;
+	continue;
+      }
+
       d_correctpackets++;
       return true;
     }
@@ -133,7 +155,12 @@ ComboAddress PcapPacketReader::getDest() const
   return ret;
 }
 
-PcapPacketWriter::PcapPacketWriter(const string& fname, PcapPacketReader& ppr) : d_fname(fname), d_ppr(ppr)
+PcapPacketWriter::PcapPacketWriter(const string& fname, const PcapPacketReader& ppr) : PcapPacketWriter(fname)
+{
+  setPPR(ppr);
+}
+
+PcapPacketWriter::PcapPacketWriter(const string& fname) : d_fname(fname)
 {
   d_fp=fopen(fname.c_str(),"w");
   if(!d_fp)
@@ -141,14 +168,20 @@ PcapPacketWriter::PcapPacketWriter(const string& fname, PcapPacketReader& ppr) :
   
   int flags=fcntl(fileno(d_fp),F_GETFL,0);
   fcntl(fileno(d_fp), F_SETFL,flags&(~O_NONBLOCK)); // bsd needs this in stdin (??)
-
-  fwrite(&ppr.d_pfh, 1, sizeof(ppr.d_pfh), d_fp);
 }
 
 void PcapPacketWriter::write()
 {
-  fwrite(&d_ppr.d_pheader, 1, sizeof(d_ppr.d_pheader), d_fp);
-  fwrite(d_ppr.d_buffer, 1, d_ppr.d_pheader.caplen, d_fp);
+  if (!d_ppr) {
+    return;
+  }
+
+  if(d_first) {
+    fwrite(&d_ppr->d_pfh, 1, sizeof(d_ppr->d_pfh), d_fp);
+    d_first=false;
+  }
+  fwrite(&d_ppr->d_pheader, 1, sizeof(d_ppr->d_pheader), d_fp);
+  fwrite(d_ppr->d_buffer, 1, d_ppr->d_pheader.caplen, d_fp);
 }
 
 PcapPacketWriter::~PcapPacketWriter()

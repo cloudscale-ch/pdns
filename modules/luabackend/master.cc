@@ -5,6 +5,10 @@
     it under the terms of the GNU General Public License version 2 as published 
     by the Free Software Foundation
 
+    Additionally, the license of this program contains a special
+    exception which allows to distribute the program in binary form when
+    it is linked against OpenSSL.
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -16,6 +20,9 @@
 */
 
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "luabackend.hh"
 
 #include "pdns/logger.hh"
@@ -66,8 +73,8 @@ void LUABackend::setNotifed(int id, uint32_t serial) {
 
     lua_rawgeti(lua, LUA_REGISTRYINDEX, f_lua_setnotifed);
 
-    lua_pushnumber(lua, id);
-    lua_pushnumber(lua, serial);
+    lua_pushinteger(lua, id);
+    lua_pushinteger(lua, serial);
 
     if(lua_pcall(lua, 2, 0, f_lua_exec_error) != 0) {
         string e = backend_name + lua_tostring(lua, -1);

@@ -28,6 +28,7 @@
 #include <stdexcept>
 
 #include "namespaces.hh"
+#include "dnsname.hh"
 
 class RecordTextException : public runtime_error
 {
@@ -51,8 +52,9 @@ public:
   void xfrIP6(std::string& val);
   void xfrTime(uint32_t& val);
 
-  void xfrLabel(string& val, bool compress=false);
-  void xfrText(string& val, bool multi=false);
+  void xfrName(DNSName& val, bool compress=false, bool noDot=false);
+  void xfrText(string& val, bool multi=false, bool lenField=true);
+  void xfrUnquotedText(string& val, bool lenField=true);
   void xfrHexBlob(string& val, bool keepReading=false);
   void xfrBase32HexBlob(string& val);
 
@@ -71,7 +73,7 @@ private:
 class RecordTextWriter
 {
 public:
-  RecordTextWriter(string& str);
+  RecordTextWriter(string& str, bool noDot=false);
   void xfr48BitInt(const uint64_t& val);
   void xfr32BitInt(const uint32_t& val);
   void xfr16BitInt(const uint16_t& val);
@@ -82,13 +84,15 @@ public:
   void xfrBase32HexBlob(const string& val);
 
   void xfrType(const uint16_t& val);
-  void xfrLabel(const string& val, bool compress=false);
-  void xfrText(const string& val, bool multi=false);
+  void xfrName(const DNSName& val, bool compress=false, bool noDot=false);
+  void xfrText(const string& val, bool multi=false, bool lenField=true);
+  void xfrUnquotedText(const string& val, bool lenField=true);
   void xfrBlobNoSpaces(const string& val, int len=-1);
   void xfrBlob(const string& val, int len=-1);
   void xfrHexBlob(const string& val, bool keepReading=false);
   bool eof() { return true; };
 private:
   string& d_string;
+  bool d_nodot;
 };
 #endif

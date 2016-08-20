@@ -1,6 +1,6 @@
 /*
     PowerDNS Versatile Database Driven Nameserver
-    Copyright (C) 2002-2012  PowerDNS.COM BV
+    Copyright (C) 2002-2016  PowerDNS.COM BV
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 2
@@ -19,6 +19,9 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "utility.hh"
 #include "webserver.hh"
 #include "misc.hh"
@@ -36,16 +39,19 @@ struct connectionThreadData {
   Socket* client;
 };
 
-void HttpRequest::json(rapidjson::Document& document)
+json11::Json HttpRequest::json()
 {
+  string err;
   if(this->body.empty()) {
     L<<Logger::Debug<<"HTTP: JSON document expected in request body, but body was empty" << endl;
     throw HttpBadRequestException();
   }
-  if(document.Parse<0>(this->body.c_str()).HasParseError()) {
-    L<<Logger::Debug<<"HTTP: parsing of JSON document failed" << endl;
+  json11::Json doc = json11::Json::parse(this->body, err);
+  if (doc.is_null()) {
+    L<<Logger::Debug<<"HTTP: parsing of JSON document failed:" << err << endl;
     throw HttpBadRequestException();
   }
+  return doc;
 }
 
 bool HttpRequest::compareAuthorization(const string &expected_password)
@@ -79,14 +85,21 @@ bool HttpRequest::compareHeader(const string &header_name, const string &expecte
 }
 
 
-void HttpResponse::setBody(rapidjson::Document& document)
+void HttpResponse::setBody(const json11::Json& document)
 {
-  this->body = makeStringFromDocument(document);
+  document.dump(this->body);
 }
 
-int WebServer::B64Decode(const std::string& strInput, std::string& strOutput)
+void HttpResponse::setErrorResult(const std::string& message, const int status)
 {
-  return ::B64Decode(strInput, strOutput);
+  setBody(json11::Json::object { { "error", message } });
+  this->status = status;
+}
+
+void HttpResponse::setSuccessResult(const std::string& message, const int status)
+{
+  setBody(json11::Json::object { { "result", message } });
+  this->status = status;
 }
 
 static void bareHandlerWrapper(WebServer::HandlerFunction handler, YaHTTP::Request* req, YaHTTP::Response* resp)
@@ -116,30 +129,31 @@ static bool optionsHandler(HttpRequest* req, HttpResponse* resp) {
 }
 
 static void apiWrapper(WebServer::HandlerFunction handler, HttpRequest* req, HttpResponse* resp) {
-  const string& api_key = arg()["experimental-api-key"];
+  const string& api_key = arg()["api-key"];
 
   if (optionsHandler(req, resp)) return;
 
   resp->headers["access-control-allow-origin"] = "*";
 
   if (api_key.empty()) {
-    L<<Logger::Debug<<"HTTP API Request \"" << req->url.path << "\": Authentication failed, API Key missing in config" << endl;
-    throw HttpUnauthorizedException();
+    L<<Logger::Error<<"HTTP API Request \"" << req->url.path << "\": Authentication failed, API Key missing in config" << endl;
+    throw HttpUnauthorizedException("X-API-Key");
   }
-  bool auth_ok = req->compareHeader("x-api-key", api_key);
+  bool auth_ok = req->compareHeader("x-api-key", api_key) || req->getvars["api-key"]==api_key;
+  
   if (!auth_ok) {
-    L<<Logger::Debug<<"HTTP Request \"" << req->url.path << "\": Authentication by API Key failed" << endl;
-    throw HttpUnauthorizedException();
+    L<<Logger::Error<<"HTTP Request \"" << req->url.path << "\": Authentication by API Key failed" << endl;
+    throw HttpUnauthorizedException("X-API-Key");
   }
 
   resp->headers["Content-Type"] = "application/json";
 
-  string callback;
-
-  if(req->getvars.count("callback")) {
-    callback=req->getvars["callback"];
-    req->getvars.erase("callback");
-  }
+  // security headers
+  resp->headers["X-Content-Type-Options"] = "nosniff";
+  resp->headers["X-Frame-Options"] = "deny";
+  resp->headers["X-Permitted-Cross-Domain-Policies"] = "none";
+  resp->headers["X-XSS-Protection"] = "1; mode=block";
+  resp->headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'";
 
   req->getvars.erase("_"); // jQuery cache buster
 
@@ -147,22 +161,16 @@ static void apiWrapper(WebServer::HandlerFunction handler, HttpRequest* req, Htt
     resp->status = 200;
     handler(req, resp);
   } catch (ApiException &e) {
-    resp->body = returnJsonError(e.what());
-    resp->status = 422;
+    resp->setErrorResult(e.what(), 422);
     return;
   } catch (JsonException &e) {
-    resp->body = returnJsonError(e.what());
-    resp->status = 422;
+    resp->setErrorResult(e.what(), 422);
     return;
   }
 
   if (resp->status == 204) {
     // No Content -> no Content-Type.
     resp->headers.erase("Content-Type");
-  }
-
-  if(!callback.empty()) {
-    resp->body = callback + "(" + resp->body + ");";
   }
 }
 
@@ -178,7 +186,7 @@ static void webWrapper(WebServer::HandlerFunction handler, HttpRequest* req, Htt
     bool auth_ok = req->compareAuthorization(web_password);
     if (!auth_ok) {
       L<<Logger::Debug<<"HTTP Request \"" << req->url.path << "\": Web Authentication failed" << endl;
-      throw HttpUnauthorizedException();
+      throw HttpUnauthorizedException("Basic");
     }
   }
 
@@ -201,10 +209,8 @@ static void *WebServerConnectionThreadStart(void *p) {
   return NULL;
 }
 
-HttpResponse WebServer::handleRequest(HttpRequest req)
+void WebServer::handleRequest(HttpRequest& req, HttpResponse& resp)
 {
-  HttpResponse resp;
-
   // set default headers
   resp.headers["Content-Type"] = "text/html; charset=utf-8";
 
@@ -237,7 +243,7 @@ HttpResponse WebServer::handleRequest(HttpRequest req)
       handler(&req, &resp);
       L<<Logger::Debug<<"HTTP: Result for \"" << req.url.path << "\": " << resp.status << ", body length: " << resp.body.size() << endl;
     }
-    catch(HttpException) {
+    catch(HttpException&) {
       throw;
     }
     catch(PDNSException &e) {
@@ -262,7 +268,7 @@ HttpResponse WebServer::handleRequest(HttpRequest req)
       resp.body = "<!html><title>" + what + "</title><h1>" + what + "</h1>";
     } else if (req.accept_json) {
       resp.headers["Content-Type"] = "application/json";
-      resp.body = returnJsonError(what);
+      resp.setErrorResult(what, resp.status);
     } else {
       resp.headers["Content-Type"] = "text/plain; charset=utf-8";
       resp.body = what;
@@ -270,16 +276,14 @@ HttpResponse WebServer::handleRequest(HttpRequest req)
   }
 
   // always set these headers
-  resp.headers["Server"] = "PowerDNS/"VERSION;
+  resp.headers["Server"] = "PowerDNS/" VERSION;
   resp.headers["Connection"] = "close";
 
   if (req.method == "HEAD") {
     resp.body = "";
   } else {
-    resp.headers["Content-Length"] = lexical_cast<string>(resp.body.size());
+    resp.headers["Content-Length"] = std::to_string(resp.body.size());
   }
-
-  return resp;
 }
 
 void WebServer::serveConnection(Socket *client)
@@ -308,7 +312,8 @@ try {
     // request stays incomplete
   }
 
-  HttpResponse resp = WebServer::handleRequest(req);
+  HttpResponse resp;
+  WebServer::handleRequest(req, resp);
   ostringstream ss;
   resp.write(ss);
   string reply = ss.str();

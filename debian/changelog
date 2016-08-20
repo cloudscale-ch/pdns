@@ -1,3 +1,195 @@
+pdns (4.0.1-1) unstable; urgency=medium
+
+  * New upstream release, drop upstream applied patch. (Closes: #828490,
+    #830808)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sat, 30 Jul 2016 20:38:41 +0000
+
+pdns (4.0.0-5) unstable; urgency=medium
+
+  * Prevent empty DEALLOCATE.
+    Apply patch from upstream to prevent flooding PostgreSQL with empty
+    DEALLOCATE SQL commands. (Closes: #831741)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Thu, 21 Jul 2016 12:57:45 +0000
+
+pdns (4.0.0-4) unstable; urgency=medium
+
+  * debian/watch: Fix versionmangle for rc releases
+  * Remove supermaster.conf during purge if empty
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 17 Jul 2016 20:15:27 +0000
+
+pdns (4.0.0-3) unstable; urgency=medium
+
+  * Avoid unchanged configuration prompt on upgrade from before 4.0.0-2
+  * Override lintian W: non-standard-file-perm etc/powerdns/pdns.conf
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Fri, 15 Jul 2016 22:28:26 +0000
+
+pdns (4.0.0-2) unstable; urgency=medium
+
+  * Split bind backend into its own package and stop using ucf where possible
+    (Closes: #701798)
+  * Update README.Debian, remove outdated info
+  * Drop "Replaces: pdns" which has not been needed since wheezy
+  * Drop version on Depends: lsb-base, which is already fulfilled in oldstable
+  * Drop version on Depends: ucf, which is already fulfilled in oldstable
+  * debian/copyright: Add short license names where needed
+  * Drop unused lintian overrides
+  * Simplify maintainer scripts, stop stopping pdns-server in prerm
+  * Ensure daemon startup errors do not cause dpkg to fail
+  * Drop upgrade code from versions before oldoldstable
+  * Drop unused lintian overrides (all of them)
+  * pdns-backend-godbc: Stop registering example with ucf
+  * Stop installing resolvconf recursor= update hook.
+    Mixing authoritative and recursive in a single daemon is not
+    recommended in the first place.
+  * Rename example config files
+  * Use dh_auto_configure and stop manually passing V=1 to make
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Thu, 14 Jul 2016 16:54:11 +0000
+
+pdns (4.0.0-1) unstable; urgency=medium
+
+  * New upstream release, drop upstream applied patches.
+  * Update debhelper dependency for dbgsym options.
+  * Move package to pkg-dns team.
+  * Update debian/copyright for backend files, m4 files.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Mon, 11 Jul 2016 13:16:07 +0200
+
+pdns (4.0.0~beta1-2) unstable; urgency=medium
+
+  * Drop extra -latomic, fixed upstream.
+  * Import proposed patch renaming notify to pdns_notify. (Closes: #825804)
+  * Enable OpenDBX backend. (Closes: #716726)
+  * Enable godbc backend.
+  * Enable random backend (part of the pdns-server binary package).
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Mon, 06 Jun 2016 20:36:37 +0000
+
+pdns (4.0.0~beta1-1) unstable; urgency=medium
+
+  * New upstream version.
+    * Build with systemd Type=notify support and use it.
+    * Merge some upstream packaging changes, gets us new tools and
+      manpages in pdns-tools.
+  * Stop patching config-dir in pdns.conf
+  * pdns-backend-mysql: Fix ucf registration (Closes: #816362)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 29 May 2016 14:43:55 +0000
+
+pdns (4.0.0~alpha3-1) unstable; urgency=medium
+
+  * d/watch: Set versionmangle for alpha releases
+  * Bump Standards-Version to 3.9.8 (no changes needed)
+  * New upstream version.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Thu, 12 May 2016 11:29:14 +0000
+
+pdns (4.0.0~alpha2-4) unstable; urgency=medium
+
+  * Ensure server and backends are always updated together,
+    otherwise strange errors occur at runtime/startup.
+  * Update Vcs-* URLs to point to secure location.
+  * Remove pdns-recursor from Suggests, typical installations will not
+    have both.
+  * Remove Matthijs Möhlmann from Uploaders for now.
+  * Remove unused lintian overrides.
+  * Fix lintian warnings:
+    * Override possible-gpl-code-linked-with-openssl, we have a license
+      exception.
+    * Remove unused file paragraphs from debian/copyright.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Thu, 24 Mar 2016 20:29:31 +0000
+
+pdns (4.0.0~alpha2-3) unstable; urgency=medium
+
+  * Drop unused libzmq-dev build-dependency (Closes: #818223)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Mon, 14 Mar 2016 20:08:39 +0000
+
+pdns (4.0.0~alpha2-2) unstable; urgency=medium
+
+  * Update Build-Dependencies for newer upstream version
+  * Build with -latomic for mips(el)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 28 Feb 2016 20:34:31 +0000
+
+pdns (4.0.0~alpha2-1) unstable; urgency=medium
+
+  * Fix dbconfig-pgsql name
+  * New upstream version: 4.0.0-alpha2
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 28 Feb 2016 17:28:31 +0000
+
+pdns (4.0.0~alpha1-2) unstable; urgency=medium
+
+  * Update systemd unit file from upstream.
+  * Build with Lua 5.3 instead of 5.1.
+  * Drop pdns-server-dbg in favor of automated dbgsym packages.
+  * Fix zone2sql call in autopkgtests.
+  * Use dbconfig-x metapackages instead of direct SQL DB clients.
+    (Closes: #801565)
+  * Disable secpoll by default.
+  * Move daemon startup options out of default config. They are included in
+    the sysvinit script and systemd unit file instead.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Wed, 24 Feb 2016 21:52:47 +0000
+
+pdns (4.0.0~alpha1-1) unstable; urgency=medium
+
+  * New upstream version: 4.0.0-alpha1
+    * Update debian/copyright.
+    * Disable lmdb backend (gone upstream).
+    * Add curl to Build-Depends.
+    * Follow pdnssec -> pdnsutil rename.
+    * Drop our mbedtls patch, as upstream now natively supports it.
+  * Enable reproducible build.
+  * Drop debconf questions that didn't really work.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Fri, 25 Dec 2015 17:05:29 +0000
+
+pdns (3.4.7-2) unstable; urgency=medium
+
+  * Switch from polarssl to mbedtls (Closes: #808065)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Tue, 15 Dec 2015 17:20:09 +0000
+
+pdns (3.4.7-1) unstable; urgency=medium
+
+  * New upstream release. Operating, stability, interop improvements.
+    Adds OPENPGPKEY support. New default-soa-edit(-signed) settings.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 08 Nov 2015 13:43:27 +0000
+
+pdns (3.4.6-3) unstable; urgency=medium
+
+  * Remove unused Build-Dependencies
+  * pdns-tools: Correctly Break/Replace pdns-server << 3.4.6-2.
+    As some pdns-tools files were previously shipped in pdns-server.
+    Thanks to Andreas Beckmann <anbe@debian.org> (Closes: #802737)
+  * Fix upgrades with default configuration.
+    The postinst script used to do a "grep include" on pdns.conf, which
+    in older versions would work (mostly), because the default config
+    only had a single "include=" entry. Now this is no longer true,
+    so remove that. Also, changing the include directory would have
+    never worked. (Closes: #798773)
+    Thanks to Stephen Frost <sfrost@snowman.net>.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 25 Oct 2015 15:22:57 +0000
+
+pdns (3.4.6-2) unstable; urgency=medium
+
+  * Retroactively add CVE to 3.4.6-1 changelog
+  * Move pdns.conf creation to override_dh_install.
+    Purely cosmetic, but aligned with the upstream packaging.
+  * Replace geobackend with geoipbackend (Closes: #798566)
+  * Ship (more) tools as part of the new pdns-tools package
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Thu, 10 Sep 2015 21:51:38 +0000
+
 pdns (3.4.6-1~bpo8+1) jessie-backports; urgency=medium
 
   * Rebuild for jessie-backports.

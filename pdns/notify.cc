@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include <bitset>
 #include "dnsparser.hh"
 #include "iputils.hh"
@@ -28,11 +31,28 @@ ArgvMap &arg()
   return arg;
 }
 
+void usage() {
+  cerr<<"Syntax: pdns_notify IP_ADDRESS[:PORT] DOMAIN"<<endl;
+}
+
 int main(int argc, char** argv)
 try
 {
+
+  for(int n=1 ; n < argc; ++n) {
+    if ((string) argv[n] == "--help") {
+      usage();
+      return EXIT_SUCCESS;
+    }
+
+    if ((string) argv[n] == "--version") {
+      cerr<<"notify "<<VERSION<<endl;
+      return EXIT_SUCCESS;
+    }
+  }
+
   if(argc!=3) {
-    cerr<<"Syntax: notify ip:port domain"<<endl;
+    usage();
     exit(1);
   }
 
@@ -50,7 +70,7 @@ try
     throw runtime_error("Failed to connect PowerDNS socket to address "+pdns.toString()+": "+stringerror());
   
   vector<uint8_t> outpacket;
-  DNSPacketWriter pw(outpacket, argv[2], QType::SOA, 1, Opcode::Notify);
+  DNSPacketWriter pw(outpacket, DNSName(argv[2]), QType::SOA, 1, Opcode::Notify);
   pw.getHeader()->id = random();
 
 

@@ -8,7 +8,6 @@
 #include "dnsparser.hh"
 #include "iputils.hh"
 #include "namespaces.hh"
-#include "namespaces.hh"
 
 struct QuestionIdentifier
 {
@@ -43,7 +42,7 @@ struct QuestionIdentifier
 
   ComboAddress d_source, d_dest;
 
-  string d_qname;
+  DNSName d_qname;
   uint16_t d_qtype;
   uint16_t d_id;
 };
