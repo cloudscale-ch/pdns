@@ -1,3 +1,9 @@
+pdns (4.0.1-1~bpo8+1) jessie-backports; urgency=medium
+
+  * Rebuild for jessie-backports.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sat, 20 Aug 2016 13:08:15 +0000
+
 pdns (4.0.1-1) unstable; urgency=medium
 
   * New upstream release, drop upstream applied patch. (Closes: #828490,
