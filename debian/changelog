@@ -1,3 +1,10 @@
+pdns (4.0.3-1~bpo8+1) jessie-backports; urgency=medium
+
+  * Rebuild for jessie-backports, switch Lua to 5.2 and
+    default-mysql-server to mysql-server.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Fri, 05 May 2017 17:58:55 +0000
+
 pdns (4.0.3-1) unstable; urgency=medium
 
   * New upstream version 4.0.3, fixing bug when running bindbackend
@@ -61,12 +68,6 @@ pdns (4.0.1-2) unstable; urgency=medium
     (Closes: #828490)
 
  -- Christian Hofstaedtler <zeha@debian.org>  Mon, 05 Sep 2016 18:43:49 +0000
-
-pdns (4.0.1-1~bpo8+1) jessie-backports; urgency=medium
-
-  * Rebuild for jessie-backports.
-
- -- Christian Hofstaedtler <zeha@debian.org>  Sat, 20 Aug 2016 13:08:15 +0000
 
 pdns (4.0.1-1) unstable; urgency=medium
 
