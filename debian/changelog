@@ -1,3 +1,67 @@
+pdns (4.0.3-1) unstable; urgency=medium
+
+  * New upstream version 4.0.3, fixing bug when running bindbackend
+    mixed with other backends.
+  * Fix mysql-5.6 schema incompatibility (Closes: #851586)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Thu, 19 Jan 2017 23:05:09 +0000
+
+pdns (4.0.2-1) unstable; urgency=medium
+
+  * New upstream version, fixing security issues: CVE-2016-7068 CVE-2016-7072
+    CVE-2016-7073 CVE-2016-7074 CVE-2016-2120.
+  * Also includes previous patches applied in Debian, esp. the libssl
+    1.1 fixes.
+  * Drop upstream applied patches.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Fri, 13 Jan 2017 14:20:11 +0000
+
+pdns (4.0.1-7) unstable; urgency=medium
+
+  * Drop RestrictAddressFamilies from .service file on 32bit.
+    This feature is broken in systemd before v233. (See also #849817)
+  * Add 4.0-series patches from upstream:
+    Fixing issues in remotebackend http, mydnsbackend, a DNSName
+    issue in core, a cleanup on randomness, and a performance
+    improvement in bindbackend.
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sat, 31 Dec 2016 15:23:27 +0000
+
+pdns (4.0.1-6) unstable; urgency=medium
+
+  * Fix init script "status" command without lsb library
+  * Make mysql schema compatible with MariaDB
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Sun, 18 Dec 2016 22:07:18 +0000
+
+pdns (4.0.1-5) unstable; urgency=medium
+
+  * Remove our lsb-base dependency
+  * Update Suggest mysql-server to default-mysql-server
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Tue, 11 Oct 2016 02:45:15 +0000
+
+pdns (4.0.1-4) unstable; urgency=medium
+
+  * Apply patches to fix API, PostgreSQL issues
+  * Switch Build-Depends from libmysqlclient-dev to default-libmysqlclient-dev
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Mon, 10 Oct 2016 18:34:28 +0000
+
+pdns (4.0.1-3) unstable; urgency=medium
+
+  * Disable systemd integration on non-Linux archs. Patch from
+    Pino Toscano <pino@debian.org>. (Closes: #837348)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Mon, 10 Oct 2016 14:30:03 +0000
+
+pdns (4.0.1-2) unstable; urgency=medium
+
+  * Add patches from upstream to fix build with OpenSSL 1.1.0 final (again)
+    (Closes: #828490)
+
+ -- Christian Hofstaedtler <zeha@debian.org>  Mon, 05 Sep 2016 18:43:49 +0000
+
 pdns (4.0.1-1~bpo8+1) jessie-backports; urgency=medium
 
   * Rebuild for jessie-backports.
