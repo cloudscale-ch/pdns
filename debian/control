@@ -84,6 +84,17 @@ Description: Tools for DNS debugging by PowerDNS
    * nsec3dig: Calculate the correctness of NSEC3 proofs
    * saxfr: AXFR zones and show extra information
 
+Package: pdns-ixfrdist
+Architecture: any
+Depends: adduser,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: Redistribute DNS zones over AXFR/IXFR
+ Transfers zones from an authoritative DNS server and serves them
+ over AXFR and IXFR, caching multiple versions as needed on disk.
+ This tool does not require any part of the PowerDNS server
+ components to work.
+
 Package: pdns-backend-bind
 Architecture: any
 Depends: pdns-server (= ${binary:Version}),
