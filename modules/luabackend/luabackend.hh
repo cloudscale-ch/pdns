@@ -36,7 +36,6 @@
 #include <string>
 using std::string;
 
-//#undef L
 
 
 
@@ -69,15 +68,14 @@ public:
 
 //  SLAVE BACKEND
 
-    bool getDomainInfo(const DNSName& domain, DomainInfo &di) override;
-    bool isMaster(const DNSName& name, const string &ip) override;
+    bool getDomainInfo(const DNSName& domain, DomainInfo &di, bool getSerial=true) override;
     void getUnfreshSlaveInfos(vector<DomainInfo>* domains) override;
     void setFresh(uint32_t id) override;
 
     bool startTransaction(const DNSName &qname, int id) override;
     bool commitTransaction() override;
     bool abortTransaction() override;
-    bool feedRecord(const DNSResourceRecord &rr, const DNSName &ordername) override;
+    bool feedRecord(const DNSResourceRecord &rr, const DNSName &ordername, bool ordernameIsNSEC3=false) override;
 
 
 //  SUPERMASTER BACKEND

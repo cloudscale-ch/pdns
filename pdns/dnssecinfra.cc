@@ -52,18 +52,25 @@ using namespace boost::assign;
 shared_ptr<DNSCryptoKeyEngine> DNSCryptoKeyEngine::makeFromISCFile(DNSKEYRecordContent& drc, const char* fname)
 {
   string sline, isc;
-  FILE *fp=fopen(fname, "r");
+  auto fp = std::unique_ptr<FILE, int(*)(FILE*)>(fopen(fname, "r"), fclose);
   if(!fp) {
     throw runtime_error("Unable to read file '"+string(fname)+"' for generating DNS Private Key");
   }
   
-  while(stringfgets(fp, sline)) {
+  while(stringfgets(fp.get(), sline)) {
     isc += sline;
   }
-  fclose(fp);
+  fp.reset();
+
   shared_ptr<DNSCryptoKeyEngine> dke = makeFromISCString(drc, isc);
-  if(!dke->checkKey()) {
-    throw runtime_error("Invalid DNS Private Key in file '"+string(fname));
+  vector<string> checkKeyErrors;
+
+  if(!dke->checkKey(&checkKeyErrors)) {
+    string reason;
+    if(checkKeyErrors.size()) {
+      reason = " ("+boost::algorithm::join(checkKeyErrors, ", ")+")";
+    }
+    throw runtime_error("Invalid DNS Private Key in file '"+string(fname)+"'"+reason);
   }
   return dke;
 }
@@ -96,6 +103,9 @@ shared_ptr<DNSCryptoKeyEngine> DNSCryptoKeyEngine::makeFromISCString(DNSKEYRecor
     }  else if (pdns_iequals(key,"label")) {
       stormap["label"]=value;
       continue;
+    } else if (pdns_iequals(key,"publabel")) {
+      stormap["publabel"]=value;
+      continue;
     }
     else if(pdns_iequals(key, "Private-key-format"))
       continue;
@@ -124,14 +134,13 @@ shared_ptr<DNSCryptoKeyEngine> DNSCryptoKeyEngine::makeFromISCString(DNSKEYRecor
 
 std::string DNSCryptoKeyEngine::convertToISC() const
 {
-  typedef map<string, string> stormap_t;
   storvector_t stormap = this->convertToISCVector();
   ostringstream ret;
   ret<<"Private-key-format: v1.2\n";
   for(const stormap_t::value_type& value :  stormap) {
     if(value.first != "Algorithm" && value.first != "PIN" && 
        value.first != "Slot" && value.first != "Engine" &&
-       value.first != "Label") 
+       value.first != "Label" && value.first != "PubLabel")
       ret<<value.first<<": "<<Base64Encode(value.second)<<"\n";
     else
       ret<<value.first<<": "<<value.second<<"\n";
@@ -235,11 +244,11 @@ pair<unsigned int, unsigned int> DNSCryptoKeyEngine::testMakers(unsigned int alg
   unsigned int bits;
   if(algo <= 10)
     bits=1024;
-  else if(algo == 12 || algo == 13 || algo == 15) // ECC-GOST or ECDSAP256SHA256 or ED25519
-    bits=256;
-  else if(algo == 14) // ECDSAP384SHA384
+  else if(algo == DNSSECKeeper::ECCGOST || algo == DNSSECKeeper::ECDSA256 || algo == DNSSECKeeper::ED25519)
+    bits = 256;
+  else if(algo == DNSSECKeeper::ECDSA384)
     bits = 384;
-  else if(algo == 16) // ED448
+  else if(algo == DNSSECKeeper::ED448)
     bits = 456;
   else
     throw runtime_error("Can't guess key size for algorithm "+std::to_string(algo));
@@ -446,7 +455,7 @@ DSRecordContent makeDSFromDNSKey(const DNSName& qname, const DNSKEYRecordContent
     dsrc.d_digest = dpk->hash(toHash);
   }
   catch(const std::exception& e) {
-    throw std::runtime_error("Asked to a DS of unknown digest type " + std::to_string(digest)+"\n");
+    throw std::runtime_error("Asked to create (C)DS record of unknown digest type " + std::to_string(digest));
   }
   
   dsrc.d_algorithm = drc.d_algorithm;
@@ -457,7 +466,7 @@ DSRecordContent makeDSFromDNSKey(const DNSName& qname, const DNSKEYRecordContent
 }
 
 
-static DNSKEYRecordContent makeDNSKEYFromDNSCryptoKeyEngine(const std::shared_ptr<DNSCryptoKeyEngine> pk, uint8_t algorithm, uint16_t flags)
+static DNSKEYRecordContent makeDNSKEYFromDNSCryptoKeyEngine(const std::shared_ptr<DNSCryptoKeyEngine>& pk, uint8_t algorithm, uint16_t flags)
 {
   DNSKEYRecordContent drc;
 
@@ -696,14 +705,14 @@ void addTSIG(DNSPacketWriter& pw, TSIGRecordContent& trc, const DNSName& tsigkey
 {
   TSIGHashEnum algo;
   if (!getTSIGHashEnum(trc.d_algoName, algo)) {
-    throw PDNSException(string("Unsupported TSIG HMAC algorithm ") + trc.d_algoName.toString());
+    throw PDNSException(string("Unsupported TSIG HMAC algorithm ") + trc.d_algoName.toLogString());
   }
 
   string toSign = makeTSIGPayload(tsigprevious, reinterpret_cast<const char*>(pw.getContent().data()), pw.getContent().size(), tsigkeyname, trc, timersonly);
 
   if (algo == TSIG_GSS) {
     if (!gss_add_signature(tsigkeyname, toSign, trc.d_mac)) {
-      throw PDNSException(string("Could not add TSIG signature with algorithm 'gss-tsig' and key name '")+tsigkeyname.toString()+string("'"));
+      throw PDNSException(string("Could not add TSIG signature with algorithm 'gss-tsig' and key name '")+tsigkeyname.toLogString()+string("'"));
     }
   } else {
     trc.d_mac = calculateHMAC(tsigsecret, toSign, algo);
@@ -723,16 +732,16 @@ bool validateTSIG(const std::string& packet, size_t sigPos, const TSIGTriplet& t
 
   TSIGHashEnum algo;
   if (!getTSIGHashEnum(trc.d_algoName, algo)) {
-    throw std::runtime_error("Unsupported TSIG HMAC algorithm " + trc.d_algoName.toString());
+    throw std::runtime_error("Unsupported TSIG HMAC algorithm " + trc.d_algoName.toLogString());
   }
 
   TSIGHashEnum expectedAlgo;
   if (!getTSIGHashEnum(tt.algo, expectedAlgo)) {
-    throw std::runtime_error("Unsupported TSIG HMAC algorithm expected " + tt.algo.toString());
+    throw std::runtime_error("Unsupported TSIG HMAC algorithm expected " + tt.algo.toLogString());
   }
 
   if (algo != expectedAlgo) {
-    throw std::runtime_error("Signature with TSIG key '"+tt.name.toString()+"' does not match the expected algorithm (" + tt.algo.toString() + " / " + trc.d_algoName.toString() + ")");
+    throw std::runtime_error("Signature with TSIG key '"+tt.name.toLogString()+"' does not match the expected algorithm (" + tt.algo.toLogString() + " / " + trc.d_algoName.toLogString() + ")");
   }
 
   string tsigMsg;
@@ -741,13 +750,13 @@ bool validateTSIG(const std::string& packet, size_t sigPos, const TSIGTriplet& t
   if (algo == TSIG_GSS) {
     GssContext gssctx(tt.name);
     if (!gss_verify_signature(tt.name, tsigMsg, theirMAC)) {
-      throw std::runtime_error("Signature with TSIG key '"+tt.name.toString()+"' failed to validate");
+      throw std::runtime_error("Signature with TSIG key '"+tt.name.toLogString()+"' failed to validate");
     }
   } else {
     string ourMac = calculateHMAC(tt.secret, tsigMsg, algo);
 
     if(!constantTimeStringEquals(ourMac, theirMAC)) {
-      throw std::runtime_error("Signature with TSIG key '"+tt.name.toString()+"' failed to validate");
+      throw std::runtime_error("Signature with TSIG key '"+tt.name.toLogString()+"' failed to validate");
     }
   }
 

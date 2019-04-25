@@ -49,13 +49,11 @@ int pdns_sqlite3_clear_bindings(sqlite3_stmt *pStmt){
 class SSQLite3Statement: public SSqlStatement
 {
 public:
-  SSQLite3Statement(SSQLite3 *db, bool dolog, const string& query) : d_prepared(false)
+  SSQLite3Statement(SSQLite3 *db, bool dolog, const string& query) :
+    d_query(query),
+    d_db(db),
+    d_dolog(dolog)
   {
-    this->d_query = query;
-    this->d_dolog = dolog;
-    d_stmt = NULL;
-    d_rc = 0;
-    d_db = db;
   }
 
   int name2idx(const string& name) {
@@ -77,8 +75,10 @@ public:
 
   SSqlStatement* execute() {
     prepareStatement();
-    if (d_dolog)
-      L<<Logger::Warning<< "Query: " << d_query << endl;
+    if (d_dolog) {
+      g_log<<Logger::Warning<< "Query "<<((long)(void*)this)<<": " << d_query << endl;
+      d_dtime.set();
+    }
     int attempts = d_db->inTransaction(); // try only once
     while(attempts < 2 && (d_rc = sqlite3_step(d_stmt)) == SQLITE_BUSY) attempts++;
 
@@ -89,9 +89,16 @@ public:
         throw SSqlException(string("CANTOPEN error in sqlite3, often caused by unwritable sqlite3 db *directory*: ")+string(sqlite3_errmsg(d_db->db())));
       throw SSqlException(string("Error while retrieving SQLite query results: ")+string(sqlite3_errmsg(d_db->db())));
     }
+    if(d_dolog) 
+      g_log<<Logger::Warning<< "Query "<<((long)(void*)this)<<": "<<d_dtime.udiffNoReset()<<" usec to execute"<<endl;
     return this;
   }
-  bool hasNextRow() { return d_rc == SQLITE_ROW; }
+  bool hasNextRow() {
+    if(d_dolog && d_rc != SQLITE_ROW) {
+      g_log<<Logger::Warning<< "Query "<<((long)(void*)this)<<": "<<d_dtime.udiffNoReset()<<" total usec to last row"<<endl;
+    }
+    return d_rc == SQLITE_ROW;
+  }
 
   SSqlStatement* nextRow(row_t& row) {
     row.clear();
@@ -139,11 +146,12 @@ public:
   const string& getQuery() { return d_query; };
 private:
   string d_query;
-  sqlite3_stmt* d_stmt;
-  SSQLite3* d_db;
-  int d_rc;
+  DTime d_dtime;
+  sqlite3_stmt* d_stmt{nullptr};
+  SSQLite3* d_db{nullptr};
+  int d_rc{0};
   bool d_dolog;
-  bool d_prepared;
+  bool d_prepared{false};
 
   void prepareStatement() {
     const char *pTail;
@@ -159,14 +167,14 @@ private:
       throw SSqlException(string("Unable to compile SQLite statement : '")+d_query+"': "+sqlite3_errmsg(d_db->db()));
     }
     if (pTail && strlen(pTail)>0)
-      L<<Logger::Warning<<"Sqlite3 command partially processed. Unprocessed part: "<<pTail<<endl;
+      g_log<<Logger::Warning<<"Sqlite3 command partially processed. Unprocessed part: "<<pTail<<endl;
     d_prepared = true;
   }
 
   void releaseStatement() {
     if (d_stmt)
       sqlite3_finalize(d_stmt);
-    d_stmt = NULL;
+    d_stmt = nullptr;
     d_prepared = false;
   }
 };

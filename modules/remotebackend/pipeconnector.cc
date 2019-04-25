@@ -24,9 +24,9 @@
 #endif
 #include "remotebackend.hh"
 
-PipeConnector::PipeConnector(std::map<std::string,std::string> optionsMap) {
+PipeConnector::PipeConnector(std::map<std::string,std::string> optionsMap): d_pid(-1)  {
   if (optionsMap.count("command") == 0) {
-    L<<Logger::Error<<"Cannot find 'command' option in connection string"<<endl;
+    g_log<<Logger::Error<<"Cannot find 'command' option in connection string"<<endl;
     throw PDNSException();
   }
   this->command = optionsMap.find("command")->second;
@@ -37,8 +37,6 @@ PipeConnector::PipeConnector(std::map<std::string,std::string> optionsMap) {
      d_timeout = std::stoi(optionsMap.find("timeout")->second);
   }
 
-  d_pid = -1;
-  d_fp = NULL;
   d_fd1[0] = d_fd1[1] = -1;
   d_fd2[0] = d_fd2[1] = -1;
 }
@@ -53,8 +51,9 @@ PipeConnector::~PipeConnector(){
     waitpid(d_pid, &status, 0);
   }
 
-  close(d_fd1[1]);
-  if (d_fp != NULL) fclose(d_fp);
+  if (d_fd1[1]) {
+    close(d_fd1[1]);
+  }
 }
 
 void PipeConnector::launch() {
@@ -64,7 +63,7 @@ void PipeConnector::launch() {
   std::vector <std::string> v;
   split(v, command, is_any_of(" "));
 
-  const char *argv[v.size()+1];
+  std::vector<const char *>argv(v.size()+1);
   argv[v.size()]=0;
 
   for (size_t n = 0; n < v.size(); n++)
@@ -85,10 +84,10 @@ void PipeConnector::launch() {
     setCloseOnExec(d_fd1[1]);
     close(d_fd2[1]);
     setCloseOnExec(d_fd2[0]);
-    if(!(d_fp=fdopen(d_fd2[0],"r")))
+    if(!(d_fp=std::unique_ptr<FILE, int(*)(FILE*)>(fdopen(d_fd2[0],"r"), fclose)))
       throw PDNSException("Unable to associate a file pointer with pipe: "+stringerror());
-    if (d_timeout) 
-      setbuf(d_fp,0); // no buffering please, confuses select
+    if (d_timeout)
+      setbuf(d_fp.get(),0); // no buffering please, confuses select
   }
   else if(!d_pid) { // child
     signal(SIGCHLD, SIG_DFL); // silence a warning from perl
@@ -107,7 +106,7 @@ void PipeConnector::launch() {
 
     // stdin & stdout are now connected, fire up our coprocess!
 
-    if(execv(argv[0], const_cast<char * const *>(argv))<0) // now what
+    if(execv(argv[0], const_cast<char * const *>(argv.data()))<0) // now what
       exit(123);
 
     /* not a lot we can do here. We shouldn't return because that will leave a forked process around.
@@ -123,7 +122,7 @@ void PipeConnector::launch() {
   this->send(msg);
   msg = nullptr;
   if (this->recv(msg)==false) {
-    L<<Logger::Error<<"Failed to initialize coprocess"<<std::endl;
+    g_log<<Logger::Error<<"Failed to initialize coprocess"<<std::endl;
   }
 }
 
@@ -163,15 +162,15 @@ int PipeConnector::recv_message(Json& output)
        tv.tv_usec = (d_timeout % 1000) * 1000;
        fd_set rds;
        FD_ZERO(&rds);
-       FD_SET(fileno(d_fp),&rds);
-       int ret=select(fileno(d_fp)+1,&rds,0,0,&tv);
+       FD_SET(fileno(d_fp.get()),&rds);
+       int ret=select(fileno(d_fp.get())+1,&rds,0,0,&tv);
        if(ret<0) 
          throw PDNSException("Error waiting on data from coprocess: "+stringerror());
        if(!ret)
          throw PDNSException("Timeout waiting for data from coprocess");
      }
 
-     if(!stringfgets(d_fp, receive))
+     if(!stringfgets(d_fp.get(), receive))
        throw PDNSException("Child closed pipe");
   
       s_output.append(receive);
