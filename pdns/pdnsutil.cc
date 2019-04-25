@@ -241,7 +241,7 @@ int checkZone(DNSSECKeeper &dk, UeberBackend &B, const DNSName& zone, const vect
 {
   SOAData sd;
   if(!B.getSOAUncached(zone, sd)) {
-    cout<<"[error] No SOA record present, or active, in zone '"<<zone<<"'"<<endl;
+    cout<<"[Error] No SOA record present, or active, in zone '"<<zone<<"'"<<endl;
     cout<<"Checked 0 records of '"<<zone<<"', 1 errors, 0 warnings."<<endl;
     return 1;
   }
@@ -786,14 +786,17 @@ int listZone(const DNSName &zone) {
   di.backend->list(zone, di.id);
   DNSResourceRecord rr;
   cout<<"$ORIGIN ."<<endl;
+  cout.sync_with_stdio(false);
+  
   while(di.backend->get(rr)) {
     if(rr.qtype.getCode()) {
       if ( (rr.qtype.getCode() == QType::NS || rr.qtype.getCode() == QType::SRV || rr.qtype.getCode() == QType::MX || rr.qtype.getCode() == QType::CNAME) && !rr.content.empty() && rr.content[rr.content.size()-1] != '.') 
 	rr.content.append(1, '.');
 	
-      cout<<rr.qname<<"\t"<<rr.ttl<<"\tIN\t"<<rr.qtype.getName()<<"\t"<<rr.content<<endl;
+      cout<<rr.qname<<"\t"<<rr.ttl<<"\tIN\t"<<rr.qtype.getName()<<"\t"<<rr.content<<"\n";
     }
   }
+  cout.flush();
   return EXIT_SUCCESS;
 }
 
@@ -1215,7 +1218,7 @@ int addOrReplaceRecord(bool addOrReplace, const vector<string>& cmds) {
   di.backend->lookup(rr.qtype, name, 0, di.id);
   cout<<"New rrset:"<<endl;
   while(di.backend->get(rr)) {
-    cout<<rr.qname.toString()<<" IN "<<rr.qtype.getName()<<" "<<rr.ttl<<" "<<rr.content<<endl;      
+    cout<<rr.qname.toString()<<" "<<rr.ttl<<" IN "<<rr.qtype.getName()<<" "<<rr.content<<endl;
   }
   return EXIT_SUCCESS;
 }
@@ -1264,9 +1267,9 @@ int listAllZones(const string &type="") {
   B.getAllDomains(&domains, true);
 
   int count = 0;
-  for (vector<DomainInfo>::const_iterator di=domains.begin(); di != domains.end(); di++) {
-    if (di->kind == kindFilter || kindFilter == -1) {
-      cout<<di->zone<<endl;
+  for (const auto& di: domains) {
+    if (di.kind == kindFilter || kindFilter == -1) {
+      cout<<di.zone<<endl;
       count++;
     }
   }
@@ -1905,7 +1908,7 @@ try
     cout<<"add-record ZONE NAME TYPE [ttl] content"<<endl;
     cout<<"             [content..]           Add one or more records to ZONE"<<endl;
     cout<<"add-zone-key ZONE {zsk|ksk} [BITS] [active|inactive]"<<endl;
-    cout<<"             [rsasha1|rsasha256|rsasha512|gost|ecdsa256|ecdsa384";
+    cout<<"             [rsasha1|rsasha256|rsasha512|ecdsa256|ecdsa384";
 #if defined(HAVE_LIBSODIUM) || defined(HAVE_LIBDECAF)
     cout<<"|ed25519";
 #endif
@@ -2198,7 +2201,14 @@ try
   }
   else if(cmds[0] == "add-zone-key") {
     if(cmds.size() < 3 ) {
-      cerr << "Syntax: pdnsutil add-zone-key ZONE zsk|ksk [BITS] [active|inactive] [rsasha1|rsasha256|rsasha512|gost|ecdsa256|ecdsa384]"<<endl;
+      cerr << "Syntax: pdnsutil add-zone-key ZONE zsk|ksk [BITS] [active|inactive] [rsasha1|rsasha256|rsasha512|ecdsa256|ecdsa384";
+#if defined(HAVE_LIBSODIUM) || defined(HAVE_LIBDECAF)
+      cerr << "|ed25519";
+#endif
+#ifdef HAVE_LIBDECAF
+      cerr << "|ed448";
+#endif
+      cerr << "]"<<endl;
       return 0;
     }
     DNSName zone(cmds[1]);
@@ -2353,14 +2363,16 @@ try
     exit(listKeys(zname, dk));
   }
   else if(cmds[0] == "load-zone") {
-    if(cmds.size() != 3) {
-      cerr<<"Syntax: pdnsutil load-zone ZONE FILENAME"<<endl;
+    if(cmds.size() < 3) {
+      cerr<<"Syntax: pdnsutil load-zone ZONE FILENAME [ZONE FILENAME] .."<<endl;
       return 0;
     }
     if(cmds[1]==".")
       cmds[1].clear();
 
-    exit(loadZone(DNSName(cmds[1]), cmds[2]));
+    for(size_t n=1; n + 2 <= cmds.size(); n+=2)
+      loadZone(DNSName(cmds[n]), cmds[n+1]);
+    return 0;
   }
   else if(cmds[0] == "secure-zone") {
     if(cmds.size() < 2) {
@@ -2708,7 +2720,14 @@ try
   }
   else if(cmds[0] == "generate-zone-key") {
     if(cmds.size() < 2 ) {
-      cerr << "Syntax: pdnsutil generate-zone-key zsk|ksk [rsasha1|rsasha256|rsasha512|gost|ecdsa256|ecdsa384] [bits]"<<endl;
+      cerr << "Syntax: pdnsutil generate-zone-key zsk|ksk [rsasha1|rsasha256|rsasha512|ecdsa256|ecdsa384";
+#if defined(HAVE_LIBSODIUM) || defined(HAVE_LIBDECAF)
+      cerr << "|ed25519";
+#endif
+#ifdef HAVE_LIBDECAF
+      cerr << "|ed448";
+#endif
+      cerr << "] [bits]"<<endl;
       return 0;
     }
     // need to get algorithm, bits & ksk or zsk from commandline
@@ -2734,8 +2753,8 @@ try
     if(bits)
       cerr<<"Requesting specific key size of "<<bits<<" bits"<<endl;
 
-    DNSSECPrivateKey dspk; 
-    shared_ptr<DNSCryptoKeyEngine> dpk(DNSCryptoKeyEngine::make(algorithm)); // defaults to RSA for now, could be smart w/algorithm! XXX FIXME 
+    DNSSECPrivateKey dspk;
+    shared_ptr<DNSCryptoKeyEngine> dpk(DNSCryptoKeyEngine::make(algorithm));
     if(!bits) {
       if(algorithm <= 10)
         bits = keyOrZone ? 2048 : 1024;
@@ -2882,7 +2901,7 @@ try
        return 1;
      }
      std::vector<std::string>::iterator iter = meta.begin();
-     for(;iter != meta.end(); iter++) if (*iter == name) break;
+     for(;iter != meta.end(); ++iter) if (*iter == name) break;
      if (iter != meta.end()) meta.erase(iter);
      if (B.setDomainMetadata(zname, metaKey, meta)) {
        cout << "Disabled TSIG key " << name << " for " << zname << endl;
@@ -2920,8 +2939,8 @@ try
       std::map<std::string, std::vector<std::string> > meta;
       std::cout << "Metadata for '" << zone << "'" << endl;
       B.getAllDomainMetadata(zone, meta);
-      for(std::map<std::string, std::vector<std::string> >::const_iterator each_meta = meta.begin(); each_meta != meta.end(); each_meta++) {
-        cout << each_meta->first << " = " << boost::join(each_meta->second, ", ") << endl;
+      for(const auto& each_meta: meta) {
+        cout << each_meta.first << " = " << boost::join(each_meta.second, ", ") << endl;
       }
     }  
     return 0;
@@ -3164,9 +3183,8 @@ try
       nm=0;
       std::map<std::string, std::vector<std::string> > meta;
       if (src->getAllDomainMetadata(di.zone, meta)) {
-        std::map<std::string, std::vector<std::string> >::iterator i;
-        for(i=meta.begin(); i != meta.end(); i++) {
-          if (!tgt->setDomainMetadata(di.zone, i->first, i->second)) throw PDNSException("Failed to feed domain metadata");
+        for (const auto& i : meta) {
+          if (!tgt->setDomainMetadata(di.zone, i.first, i.second)) throw PDNSException("Failed to feed domain metadata");
           nm++;
         }
       }

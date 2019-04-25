@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2018 powerdns.com bv
+ * Copyright (c) 2018-2019 powerdns.com bv
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@
 class MiniCurl
 {
 public:
-  MiniCurl();
+  MiniCurl(const string& useragent="MiniCurl/0.0");
   ~MiniCurl();
   MiniCurl& operator=(const MiniCurl&) = delete;
   std::string getURL(const std::string& str, const ComboAddress* rem=0, const ComboAddress* src=0);

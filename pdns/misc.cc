@@ -446,9 +446,8 @@ DTime::DTime()
   d_set.tv_sec=d_set.tv_usec=0;
 }
 
-DTime::DTime(const DTime &dt)
+DTime::DTime(const DTime &dt) : d_set(dt.d_set)
 {
-  d_set=dt.d_set;
 }
 
 time_t DTime::time()
@@ -567,7 +566,7 @@ bool IpToU32(const string &str, uint32_t *ip)
 string U32ToIP(uint32_t val)
 {
   char tmp[17];
-  snprintf(tmp, sizeof(tmp)-1, "%u.%u.%u.%u",
+  snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u",
            (val >> 24)&0xff,
            (val >> 16)&0xff,
            (val >>  8)&0xff,
@@ -583,7 +582,7 @@ string makeHexDump(const string& str)
   ret.reserve((int)(str.size()*2.2));
 
   for(string::size_type n=0;n<str.size();++n) {
-    sprintf(tmp,"%02x ", (unsigned char)str[n]);
+    snprintf(tmp, sizeof(tmp), "%02x ", (unsigned char)str[n]);
     ret+=tmp;
   }
   return ret;
@@ -867,11 +866,12 @@ bool stringfgets(FILE* fp, std::string& line)
 bool readFileIfThere(const char* fname, std::string* line)
 {
   line->clear();
-  FILE* fp = fopen(fname, "r");
+  auto fp = std::unique_ptr<FILE, int(*)(FILE*)>(fopen(fname, "r"), fclose);
   if(!fp)
     return false;
-  stringfgets(fp, *line);
-  fclose(fp);
+  stringfgets(fp.get(), *line);
+  fp.reset();
+
   return true;
 }
 
@@ -1101,6 +1101,22 @@ bool isNonBlocking(int sock)
   return flags & O_NONBLOCK;
 }
 
+bool setReceiveSocketErrors(int sock, int af)
+{
+#ifdef __linux__
+  int tmp = 1, ret;
+  if (af == AF_INET) {
+    ret = setsockopt(sock, IPPROTO_IP, IP_RECVERR, &tmp, sizeof(tmp));
+  } else {
+    ret = setsockopt(sock, IPPROTO_IPV6, IPV6_RECVERR, &tmp, sizeof(tmp));
+  }
+  if (ret < 0) {
+    throw PDNSException(string("Setsockopt failed: ") + strerror(errno));
+  }
+#endif
+  return true;
+}
+
 // Closes a socket.
 int closesocket( int socket )
 {
@@ -1241,7 +1257,27 @@ uint64_t getOpenFileDescriptors(const std::string&)
 uint64_t getRealMemoryUsage(const std::string&)
 {
 #ifdef __linux__
-  ifstream ifs("/proc/"+std::to_string(getpid())+"/smaps");
+  ifstream ifs("/proc/self/statm");
+  if(!ifs)
+    return 0;
+
+  uint64_t size, resident, shared, text, lib, data;
+  ifs >> size >> resident >> shared >> text >> lib >> data;
+
+  return data * getpagesize();
+#else
+  struct rusage ru;
+  if (getrusage(RUSAGE_SELF, &ru) != 0)
+    return 0;
+  return ru.ru_maxrss * 1024;
+#endif
+}
+
+
+uint64_t getSpecialMemoryUsage(const std::string&)
+{
+#ifdef __linux__
+  ifstream ifs("/proc/self/smaps");
   if(!ifs)
     return 0;
   string line;

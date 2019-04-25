@@ -200,7 +200,7 @@ static bool processRecordForZS(const DNSName& domain, bool& firstNSEC3, DNSResou
     } else if (zs.optOutFlag != (ns3rc.d_flags & 1))
       throw PDNSException("Zones with a mixture of Opt-Out NSEC3 RRs and non-Opt-Out NSEC3 RRs are not supported.");
     zs.optOutFlag = ns3rc.d_flags & 1;
-    if (ns3rc.d_set.count(QType::NS) && !(rr.qname==domain)) {
+    if (ns3rc.isSet(QType::NS) && !(rr.qname==domain)) {
       DNSName hashPart = rr.qname.makeRelative(domain);
       zs.secured.insert(hashPart);
     }
@@ -560,7 +560,7 @@ void CommunicatorClass::suck(const DNSName &domain, const ComboAddress& remote)
           // NSEC3
           ordername=DNSName(toBase32Hex(hashQNameWithSalt(zs.ns3pr, rr.qname)));
           if(!zs.isNarrow && (rr.auth || (rr.qtype.getCode() == QType::NS && (!zs.optOutFlag || zs.secured.count(ordername))))) {
-            di.backend->feedRecord(rr, ordername);
+            di.backend->feedRecord(rr, ordername, true);
           } else
             di.backend->feedRecord(rr, DNSName());
         } else {

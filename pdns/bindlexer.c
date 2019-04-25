@@ -918,25 +918,17 @@ YY_RULE_SETUP
         include_stack_ln[include_stack_ptr++]=linenumber;
         linenumber=1;
 
-	if(*(yytext+1)=='/') {
-                if (strlen(yytext+1) >= sizeof(filename)) {
-		  fprintf( stderr, "Filename '%s' is too long\n",yytext+1);
-		  exit( 1 );
-		}
-		strcpy(filename,yytext+1);
-	}
-	else {
-		size_t bind_directory_len = strlen(bind_directory);
-		if (bind_directory_len >= sizeof(filename) ||
-		    strlen(yytext+1) + 2 >= sizeof(filename) - bind_directory_len) {
-		  fprintf( stderr, "Filename '%s' is too long\n",yytext+1);
-		  exit( 1 );
-		}
-		strcpy(filename,bind_directory);
-		strcat(filename,"/");
-		strcat(filename,yytext+1);
-	}
-	filename[sizeof(filename)-1]='\0';
+        int ret;
+        if(*(yytext+1)=='/') {
+            ret = snprintf(filename, sizeof(filename), "%s", yytext+1);
+        }
+        else {
+            ret = snprintf(filename, sizeof(filename), "%s/%s", bind_directory, yytext+1);
+        }
+        if (ret == -1 || ret >= sizeof(filename)) {
+            fprintf( stderr, "Filename '%s' is too long\n",yytext+1);
+            exit( 1 );
+        }
 
 	if (!(yyin=fopen(filename,"r"))) {
 	  fprintf( stderr, "Unable to open '%s': %s\n",filename,strerror(errno));
@@ -952,7 +944,7 @@ case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(comment):
 case YY_STATE_EOF(incl):
 case YY_STATE_EOF(quoted):
-#line 94 "bindlexer.l"
+#line 86 "bindlexer.l"
 {
         if ( --include_stack_ptr < 0 )
         {
@@ -975,94 +967,94 @@ case YY_STATE_EOF(quoted):
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 117 "bindlexer.l"
+#line 109 "bindlexer.l"
 return ZONETOK; 
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 119 "bindlexer.l"
+#line 111 "bindlexer.l"
 return FILETOK;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 120 "bindlexer.l"
+#line 112 "bindlexer.l"
 return OPTIONSTOK;
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 121 "bindlexer.l"
+#line 113 "bindlexer.l"
 return ALSONOTIFYTOK;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 122 "bindlexer.l"
+#line 114 "bindlexer.l"
 return ACLTOK;
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 123 "bindlexer.l"
+#line 115 "bindlexer.l"
 return LOGGINGTOK;
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 124 "bindlexer.l"
+#line 116 "bindlexer.l"
 return DIRECTORYTOK;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 125 "bindlexer.l"
+#line 117 "bindlexer.l"
 return MASTERTOK;
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 126 "bindlexer.l"
+#line 118 "bindlexer.l"
 return TYPETOK;
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 127 "bindlexer.l"
+#line 119 "bindlexer.l"
 yy_push_state(quoted);
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 128 "bindlexer.l"
+#line 120 "bindlexer.l"
 yylval=strdup(yytext); return QUOTEDWORD;
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 129 "bindlexer.l"
+#line 121 "bindlexer.l"
 yy_pop_state();
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 130 "bindlexer.l"
+#line 122 "bindlexer.l"
 yylval=strdup(yytext);return AWORD;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 131 "bindlexer.l"
+#line 123 "bindlexer.l"
 return OBRACE;
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 132 "bindlexer.l"
+#line 124 "bindlexer.l"
 return EBRACE;
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 133 "bindlexer.l"
+#line 125 "bindlexer.l"
 return SEMICOLON;
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 134 "bindlexer.l"
+#line 126 "bindlexer.l"
 linenumber++;
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 135 "bindlexer.l"
+#line 127 "bindlexer.l"
 ;
 	YY_BREAK
 case 27:
@@ -1070,7 +1062,7 @@ case 27:
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 136 "bindlexer.l"
+#line 128 "bindlexer.l"
 ;
 	YY_BREAK
 case 28:
@@ -1078,15 +1070,15 @@ case 28:
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 137 "bindlexer.l"
+#line 129 "bindlexer.l"
 ;
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 138 "bindlexer.l"
+#line 130 "bindlexer.l"
 ECHO;
 	YY_BREAK
-#line 1089 "bindlexer.c"
+#line 1081 "bindlexer.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2093,6 +2085,6 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 138 "bindlexer.l"
+#line 130 "bindlexer.l"
 
 

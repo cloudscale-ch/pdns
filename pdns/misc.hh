@@ -470,10 +470,8 @@ private:
 class SimpleMatch
 {
 public:
-  SimpleMatch(const string &mask, bool caseFold = false)
+  SimpleMatch(const string &mask, bool caseFold = false): d_mask(mask), d_fold(caseFold)
   {
-    this->d_mask = mask;
-    this->d_fold = caseFold;
   }
  
   bool match(string::const_iterator mi, string::const_iterator mend, string::const_iterator vi, string::const_iterator vend)
@@ -536,11 +534,13 @@ bool setNonBlocking( int sock );
 bool setTCPNoDelay(int sock);
 bool setReuseAddr(int sock);
 bool isNonBlocking(int sock);
+bool setReceiveSocketErrors(int sock, int af);
 int closesocket(int fd);
 bool setCloseOnExec(int sock);
 uint64_t udpErrorStats(const std::string& str);
 
 uint64_t getRealMemoryUsage(const std::string&);
+uint64_t getSpecialMemoryUsage(const std::string&);
 uint64_t getOpenFileDescriptors(const std::string&);
 uint64_t getCPUTimeUser(const std::string&);
 uint64_t getCPUTimeSystem(const std::string&);

@@ -166,6 +166,7 @@ pdns_server_SOURCES = \
 	common_startup.cc common_startup.hh \
 	communicator.cc communicator.hh \
 	dbdnsseckeeper.cc \
+	digests.hh \
 	distributor.hh \
 	dns.cc dns.hh \
 	dns_random.cc dns_random.hh \
@@ -194,7 +195,6 @@ pdns_server_SOURCES = \
 	lua-base4.cc lua-base4.hh \
 	lua-auth4.cc lua-auth4.hh \
 	mastercommunicator.cc \
-	md5.hh \
 	misc.cc misc.hh \
 	nameserver.cc nameserver.hh \
 	namespaces.hh \
@@ -822,6 +822,7 @@ tsig_tests_SOURCES = \
 	arguments.cc \
 	base32.cc \
 	base64.cc base64.hh \
+	digests.hh \
 	dns.cc \
 	dns_random_urandom.cc dns_random.hh \
 	dnslabeltext.cc \
@@ -989,7 +990,6 @@ dnsreplay_SOURCES = \
 	dnswriter.cc dnswriter.hh \
 	ednsoptions.cc ednsoptions.hh \
 	ednssubnet.cc ednssubnet.hh \
-	histog.hh \
 	iputils.cc \
 	logger.cc \
 	misc.cc \
@@ -1081,6 +1081,7 @@ dnsscope_SOURCES = \
 	dnsrecords.cc \
 	dnsscope.cc \
 	dnswriter.cc dnswriter.hh \
+	histog.hh \
 	logger.cc \
 	misc.cc \
 	nsecrecords.cc \
@@ -1218,7 +1219,8 @@ dnspcap2protobuf_SOURCES = \
 	sillyrecords.cc \
 	statbag.cc \
 	unix_utility.cc \
-	utility.hh
+	utility.hh \
+	uuid-utils.hh uuid-utils.cc
 
 nodist_dnspcap2protobuf_SOURCES=dnsmessage.pb.cc dnsmessage.pb.h
 
@@ -1287,6 +1289,7 @@ testrunner_SOURCES = \
 	test-bindparser_cc.cc \
 	test-common.hh \
 	test-dnsrecordcontent.cc \
+	test-digests_hh.cc \
 	test-distributor_hh.cc \
 	test-dns_random_hh.cc \
 	test-dnsname_cc.cc \
@@ -1297,7 +1300,6 @@ testrunner_SOURCES = \
 	test-ixfr_cc.cc \
 	test-lock_hh.cc \
 	test-lua_auth4_cc.cc \
-	test-md5_hh.cc \
 	test-misc_hh.cc \
 	test-nameserver_cc.cc \
 	test-packetcache_cc.cc \
@@ -1512,6 +1514,45 @@ dnsdist:
 if HAVE_SYSTEMD
 pdns.service: pdns.service.in
 	$(AM_V_GEN)sed -e 's![@]sbindir[@]!$(sbindir)!' < $< > $@
+if !HAVE_SYSTEMD_LOCK_PERSONALITY
+	$(AM_V_GEN)perl -ni -e 'print unless /^LockPersonality/' $@
+endif
+if !HAVE_SYSTEMD_PRIVATE_DEVICES
+	$(AM_V_GEN)perl -ni -e 'print unless /^PrivateDevices/' $@
+endif
+if !HAVE_SYSTEMD_PRIVATE_TMP
+	$(AM_V_GEN)perl -ni -e 'print unless /^PrivateTmp/' $@
+endif
+if !HAVE_SYSTEMD_PROTECT_CONTROL_GROUPS
+	$(AM_V_GEN)perl -ni -e 'print unless /^ProtectControlGroups/' $@
+endif
+if !HAVE_SYSTEMD_PROTECT_HOME
+	$(AM_V_GEN)perl -ni -e 'print unless /^ProtectHome/' $@
+endif
+if !HAVE_SYSTEMD_PROTECT_KERNEL_MODULES
+	$(AM_V_GEN)perl -ni -e 'print unless /^ProtectKernelModules/' $@
+endif
+if !HAVE_SYSTEMD_PROTECT_KERNEL_TUNABLES
+	$(AM_V_GEN)perl -ni -e 'print unless /^ProtectKernelTunables/' $@
+endif
+if !HAVE_SYSTEMD_PROTECT_SYSTEM
+	$(AM_V_GEN)perl -ni -e 'print unless /^ProtectSystem/' $@
+endif
+if !HAVE_SYSTEMD_RESTRICT_ADDRESS_FAMILIES
+	$(AM_V_GEN)perl -ni -e 'print unless /^RestrictAddressFamilies/' $@
+endif
+if !HAVE_SYSTEMD_RESTRICT_NAMESPACES
+	$(AM_V_GEN)perl -ni -e 'print unless /^RestrictNamespaces/' $@
+endif
+if !HAVE_SYSTEMD_RESTRICT_REALTIME
+	$(AM_V_GEN)perl -ni -e 'print unless /^RestrictRealtime/' $@
+endif
+if !HAVE_SYSTEMD_SYSTEM_CALL_ARCHITECTURES
+	$(AM_V_GEN)perl -ni -e 'print unless /^SystemCallArchitectures/' $@
+endif
+if !HAVE_SYSTEMD_SYSTEM_CALL_FILTER
+	$(AM_V_GEN)perl -ni -e 'print unless /^SystemCallFilter/' $@
+endif
 
 pdns@.service: pdns.service
 	$(AM_V_GEN)sed -e 's!/pdns_server!& --config-name=%i!' \

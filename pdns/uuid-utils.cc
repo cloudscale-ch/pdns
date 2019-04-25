@@ -19,18 +19,29 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef _MD5_H
-#define _MD5_H
 
-#include <string>
-#include <stdint.h>
-#include <openssl/md5.h>
+#include "uuid-utils.hh"
 
-inline std::string pdns_md5sum(const std::string& input)
+// see https://github.com/boostorg/random/issues/49
+#if BOOST_VERSION == 106900
+#ifndef BOOST_PENDING_INTEGER_LOG2_HPP
+#define BOOST_PENDING_INTEGER_LOG2_HPP
+#include <boost/integer/integer_log2.hpp>
+#endif /* BOOST_PENDING_INTEGER_LOG2_HPP */
+#endif /* BOOST_VERSION */
+
+#include <boost/uuid/uuid_generators.hpp>
+
+thread_local boost::uuids::random_generator t_uuidGenerator;
+
+boost::uuids::uuid getUniqueID()
 {
-  unsigned char result[16] = {0};
-  MD5(reinterpret_cast<const unsigned char*>(input.c_str()), input.length(), result);
-  return std::string(result, result + sizeof result);
+  return t_uuidGenerator();
 }
 
-#endif /* md5.h */
+boost::uuids::uuid getUniqueID(const std::string& str)
+{
+  boost::uuids::string_generator gen;
+  return gen(str);
+}
+

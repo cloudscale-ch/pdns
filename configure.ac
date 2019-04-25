@@ -1,6 +1,6 @@
 AC_PREREQ([2.61])
 
-AC_INIT([pdns], [4.2.0-alpha1])
+AC_INIT([pdns], [4.2.0-rc1])
 
 AC_CONFIG_SRCDIR([pdns/receiver.cc])
 AC_CONFIG_MACRO_DIR([m4])
@@ -110,6 +110,9 @@ BOOST_REQUIRE([1.35])
 # Boost accumulators, as used by dnsbulktest and dnstcpbench, need 1.48+
 # to be compatible with C++11
 AM_CONDITIONAL([HAVE_BOOST_GE_148], [test "$boost_major_version" -ge 148])
+AS_IF([test "$boost_major_version" -ge 148], [
+  AC_DEFINE(HAVE_BOOST_GE_148, [1], [Define to 1 if you have boost >= 1.48])
+])
 
 BOOST_PROGRAM_OPTIONS([mt])
 AS_IF([test "$boost_cv_lib_program_options" = "no"], [
@@ -176,7 +179,7 @@ for a in $modules $dynmodules; do
     godbc)
       PDNS_WITH_UNIXODBC
       ;;
-    mydns|gmysql|pdns)
+    mydns|gmysql)
       PDNS_WITH_MYSQL
       ;;
     gpgsql)
@@ -211,6 +214,10 @@ for a in $modules $dynmodules; do
       AS_IF([test "x$LUAPC" = "x"],
         [AC_MSG_ERROR([${a} backend needs lua but we cannot find it])]
       )
+      ;;
+    lmdb)
+      PDNS_CHECK_LMDB
+      BOOST_SERIALIZATION
       ;;
   esac
 done
@@ -267,6 +274,7 @@ for a in $dynmodules; do
 done
 
 AX_AVAILABLE_SYSTEMD
+AX_CHECK_SYSTEMD_FEATURES
 AM_CONDITIONAL([HAVE_SYSTEMD], [ test x"$systemd" = "xy" ])
 
 LDFLAGS="$RELRO_LDFLAGS $LDFLAGS"
@@ -317,6 +325,7 @@ AC_CONFIG_FILES([
   modules/gpgsqlbackend/Makefile
   modules/gsqlite3backend/Makefile
   modules/ldapbackend/Makefile
+  modules/lmdbbackend/Makefile
   modules/luabackend/Makefile
   modules/lua2backend/Makefile
   modules/mydnsbackend/Makefile

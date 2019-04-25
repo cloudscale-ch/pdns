@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2018 powerdns.com bv
+ * Copyright (c) 2018-2019 powerdns.com bv
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,9 +26,12 @@
 #include <curl/curl.h>
 #include <stdexcept>
 
-MiniCurl::MiniCurl()
+MiniCurl::MiniCurl(const string& useragent)
 {
   d_curl = curl_easy_init();
+  if (d_curl != nullptr) {
+    curl_easy_setopt(d_curl, CURLOPT_USERAGENT, useragent.c_str());
+  }
 }
 
 MiniCurl::~MiniCurl()

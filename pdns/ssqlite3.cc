@@ -49,13 +49,11 @@ int pdns_sqlite3_clear_bindings(sqlite3_stmt *pStmt){
 class SSQLite3Statement: public SSqlStatement
 {
 public:
-  SSQLite3Statement(SSQLite3 *db, bool dolog, const string& query) : d_prepared(false)
+  SSQLite3Statement(SSQLite3 *db, bool dolog, const string& query) :
+    d_query(query),
+    d_db(db),
+    d_dolog(dolog)
   {
-    this->d_query = query;
-    this->d_dolog = dolog;
-    d_stmt = NULL;
-    d_rc = 0;
-    d_db = db;
   }
 
   int name2idx(const string& name) {
@@ -148,12 +146,13 @@ public:
   const string& getQuery() { return d_query; };
 private:
   string d_query;
-  sqlite3_stmt* d_stmt;
-  SSQLite3* d_db;
-  int d_rc;
-  bool d_dolog;
-  bool d_prepared;
   DTime d_dtime;
+  sqlite3_stmt* d_stmt{nullptr};
+  SSQLite3* d_db{nullptr};
+  int d_rc{0};
+  bool d_dolog;
+  bool d_prepared{false};
+
   void prepareStatement() {
     const char *pTail;
 
@@ -175,7 +174,7 @@ private:
   void releaseStatement() {
     if (d_stmt)
       sqlite3_finalize(d_stmt);
-    d_stmt = NULL;
+    d_stmt = nullptr;
     d_prepared = false;
   }
 };

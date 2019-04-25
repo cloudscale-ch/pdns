@@ -56,12 +56,18 @@ static void patchZone(HttpRequest* req, HttpResponse* resp);
 static void storeChangedPTRs(UeberBackend& B, vector<DNSResourceRecord>& new_ptrs);
 static void makePtr(const DNSResourceRecord& rr, DNSResourceRecord* ptr);
 
-AuthWebServer::AuthWebServer()
+// QTypes that MUST NOT have multiple records of the same type in a given RRset.
+static const std::set<uint16_t> onlyOneEntryTypes = { QType::CNAME, QType::DNAME, QType::SOA };
+// QTypes that MUST NOT be used with any other QType on the same name.
+static const std::set<uint16_t> exclusiveEntryTypes = { QType::CNAME, QType::DNAME };
+
+AuthWebServer::AuthWebServer() :
+  d_tid(0),
+  d_start(time(nullptr)),
+  d_min10(0),
+  d_min5(0),
+  d_min1(0)
 {
-  d_start=time(0);
-  d_min10=d_min5=d_min1=0;
-  d_ws = 0;
-  d_tid = 0;
   if(arg().mustDo("webserver") || arg().mustDo("api")) {
     d_ws = new WebServer(arg()["webserver-address"], arg().asNum("webserver-port"));
     d_ws->setApiKey(arg()["api-key"]);
@@ -288,7 +294,7 @@ void AuthWebServer::indexfunction(HttpRequest* req, HttpResponse* resp)
     printtable(ret,req->getvars["ring"],S.getRingTitle(req->getvars["ring"]),100);
 
   ret<<"</div></div>"<<endl;
-  ret<<"<footer class=\"row\">"<<fullVersionString()<<"<br>&copy; 2013 - 2018 <a href=\"http://www.powerdns.com/\">PowerDNS.COM BV</a>.</footer>"<<endl;
+  ret<<"<footer class=\"row\">"<<fullVersionString()<<"<br>&copy; 2013 - 2019 <a href=\"http://www.powerdns.com/\">PowerDNS.COM BV</a>.</footer>"<<endl;
   ret<<"</body></html>"<<endl;
 
   resp->body = ret.str();
@@ -512,7 +518,8 @@ static void gatherRecords(const Json container, const DNSName& qname, const QTyp
   rr.ttl = ttl;
 
   validateGatheredRRType(rr);
-  for(auto record : container["records"].array_items()) {
+  const auto& items = container["records"].array_items();
+  for(const auto& record : items) {
     string content = stringFromJson(record, "content");
     rr.disabled = boolFromJson(record, "disabled");
 
@@ -596,17 +603,17 @@ static void throwUnableToSecure(const DNSName& zonename) {
 }
 
 static void updateDomainSettingsFromDocument(UeberBackend& B, const DomainInfo& di, const DNSName& zonename, const Json document) {
-  string zonemaster;
+  vector<string> zonemaster;
   bool shouldRectify = false;
   for(auto value : document["masters"].array_items()) {
     string master = value.string_value();
     if (master.empty())
       throw ApiException("Master can not be an empty string");
-    zonemaster += master + " ";
+    zonemaster.push_back(master);
   }
 
-  if (zonemaster != "") {
-    di.backend->setMaster(zonename, zonemaster);
+  if (zonemaster.size()) {
+    di.backend->setMaster(zonename, boost::join(zonemaster, ","));
   }
   if (document["kind"].is_string()) {
     di.backend->setKind(zonename, DomainInfo::stringToKind(stringFromJson(document, "kind")));
@@ -1292,21 +1299,44 @@ static void gatherRecordsFromZone(const std::string& zonestring, vector<DNSResou
   }
 }
 
-/** Throws ApiException if records with duplicate name/type/content are present.
+/** Throws ApiException if records which violate RRset contraints are present.
  *  NOTE: sorts records in-place.
+ *
+ *  Constraints being checked:
+ *   *) no exact duplicates
+ *   *) no duplicates for QTypes that can only be present once per RRset
+ *   *) hostnames are hostnames
  */
-static void checkDuplicateRecords(vector<DNSResourceRecord>& records) {
+static void checkNewRecords(vector<DNSResourceRecord>& records) {
   sort(records.begin(), records.end(),
     [](const DNSResourceRecord& rec_a, const DNSResourceRecord& rec_b) -> bool {
       /* we need _strict_ weak ordering */
       return std::tie(rec_a.qname, rec_a.qtype, rec_a.content) < std::tie(rec_b.qname, rec_b.qtype, rec_b.content);
     }
   );
+
   DNSResourceRecord previous;
   for(const auto& rec : records) {
-    if (previous.qtype == rec.qtype && previous.qname == rec.qname && previous.content == rec.content) {
-      throw ApiException("Duplicate record in RRset " + rec.qname.toString() + " IN " + rec.qtype.getName() + " with content \"" + rec.content + "\"");
+    if (previous.qname == rec.qname) {
+      if (previous.qtype == rec.qtype) {
+        if (onlyOneEntryTypes.count(rec.qtype.getCode()) != 0) {
+          throw ApiException("RRset "+rec.qname.toString()+" IN "+rec.qtype.getName()+" has more than one record");
+        }
+        if (previous.content == rec.content) {
+          throw ApiException("Duplicate record in RRset " + rec.qname.toString() + " IN " + rec.qtype.getName() + " with content \"" + rec.content + "\"");
+        }
+      } else if (exclusiveEntryTypes.count(rec.qtype.getCode()) != 0 || exclusiveEntryTypes.count(previous.qtype.getCode()) != 0) {
+        throw ApiException("RRset "+rec.qname.toString()+" IN "+rec.qtype.getName()+": Conflicts with another RRset");
+      }
     }
+
+    // Check if the DNSNames that should be hostnames, are hostnames
+    try {
+      checkHostnameCorrectness(rec);
+    } catch (const std::exception& e) {
+      throw ApiException("RRset "+rec.qname.toString()+" IN "+rec.qtype.getName() + " " + e.what());
+    }
+
     previous = rec;
   }
 }
@@ -1570,7 +1600,7 @@ static void apiServerZones(HttpRequest* req, HttpResponse* resp) {
       }
     }
 
-    checkDuplicateRecords(new_records);
+    checkNewRecords(new_records);
 
     if (boolFromJson(document, "dnssec", false)) {
       checkDefaultDNSSECAlgos();
@@ -1929,15 +1959,8 @@ static void patchZone(HttpRequest* req, HttpResponse* resp) {
             if (rr.qtype.getCode() == QType::SOA && rr.qname==zonename) {
               soa_edit_done = increaseSOARecord(rr, soa_edit_api_kind, soa_edit_kind);
             }
-
-            // Check if the DNSNames that should be hostnames, are hostnames
-            try {
-              checkHostnameCorrectness(rr);
-            } catch (const std::exception& e) {
-              throw ApiException("RRset "+qname.toString()+" IN "+qtype.getName() + " " + e.what());
-            }
           }
-          checkDuplicateRecords(new_records);
+          checkNewRecords(new_records);
         }
 
         if (replace_comments) {
@@ -1956,10 +1979,10 @@ static void patchZone(HttpRequest* req, HttpResponse* resp) {
             if (qtype.getCode() == 0) {
               ent_present = true;
             }
-            if (qtype.getCode() == QType::CNAME && rr.qtype.getCode() != QType::CNAME) {
-              throw ApiException("RRset "+qname.toString()+" IN "+qtype.getName()+": Conflicts with pre-existing non-CNAME RRset");
-            } else if (qtype.getCode() != QType::CNAME && rr.qtype.getCode() == QType::CNAME) {
-              throw ApiException("RRset "+qname.toString()+" IN "+qtype.getName()+": Conflicts with pre-existing CNAME RRset");
+            if (qtype.getCode() != rr.qtype.getCode()
+              && (exclusiveEntryTypes.count(qtype.getCode()) != 0
+                || exclusiveEntryTypes.count(rr.qtype.getCode()) != 0)) {
+              throw ApiException("RRset "+qname.toString()+" IN "+qtype.getName()+": Conflicts with pre-existing RRset");
             }
           }
 
@@ -2035,8 +2058,19 @@ static void apiServerSearchData(HttpRequest* req, HttpResponse* resp) {
 
   string q = req->getvars["q"];
   string sMax = req->getvars["max"];
+  string sObjectType = req->getvars["object_type"];
+
   int maxEnts = 100;
   int ents = 0;
+
+  // the following types of data can be searched for using the api
+  enum class ObjectType
+  {
+    ALL,
+    ZONE,
+    RECORD,
+    COMMENT
+  } objectType;
 
   if (q.empty())
     throw ApiException("Query q can't be blank");
@@ -2044,6 +2078,19 @@ static void apiServerSearchData(HttpRequest* req, HttpResponse* resp) {
     maxEnts = std::stoi(sMax);
   if (maxEnts < 1)
     throw ApiException("Maximum entries must be larger than 0");
+
+  if (sObjectType.empty())
+    objectType = ObjectType::ALL;
+  else if (sObjectType == "all")
+    objectType = ObjectType::ALL;
+  else if (sObjectType == "zone")
+    objectType = ObjectType::ZONE;
+  else if (sObjectType == "record")
+    objectType = ObjectType::RECORD;
+  else if (sObjectType == "comment")
+    objectType = ObjectType::COMMENT;
+  else
+    throw ApiException("object_type must be one of the following options: all, zone, record, comment");
 
   SimpleMatch sm(q,true);
   UeberBackend B;
@@ -2058,7 +2105,7 @@ static void apiServerSearchData(HttpRequest* req, HttpResponse* resp) {
 
   for(const DomainInfo di: domains)
   {
-    if (ents < maxEnts && sm.match(di.zone)) {
+    if ((objectType == ObjectType::ALL || objectType == ObjectType::ZONE) && ents < maxEnts && sm.match(di.zone)) {
       doc.push_back(Json::object {
         { "object_type", "zone" },
         { "zone_id", apiZoneNameToId(di.zone) },
@@ -2069,7 +2116,7 @@ static void apiServerSearchData(HttpRequest* req, HttpResponse* resp) {
     zoneIdZone[di.id] = di; // populate cache
   }
 
-  if (B.searchRecords(q, maxEnts, result_rr))
+  if ((objectType == ObjectType::ALL || objectType == ObjectType::RECORD) && B.searchRecords(q, maxEnts, result_rr))
   {
     for(const DNSResourceRecord& rr: result_rr)
     {
@@ -2092,7 +2139,7 @@ static void apiServerSearchData(HttpRequest* req, HttpResponse* resp) {
     }
   }
 
-  if (B.searchComments(q, maxEnts, result_c))
+  if ((objectType == ObjectType::ALL || objectType == ObjectType::COMMENT) && B.searchComments(q, maxEnts, result_c))
   {
     for(const Comment &c: result_c)
     {

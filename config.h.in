@@ -15,11 +15,20 @@
 /* Defined if the requested minimum BOOST version is satisfied */
 #undef HAVE_BOOST
 
+/* Define to 1 if you have <boost/archive/text_oarchive.hpp> */
+#undef HAVE_BOOST_ARCHIVE_TEXT_OARCHIVE_HPP
+
+/* Define to 1 if you have boost >= 1.48 */
+#undef HAVE_BOOST_GE_148
+
 /* Defined if the Boost program_options library is available */
 #undef HAVE_BOOST_PROGRAM_OPTIONS
 
 /* Define to 1 if you have <boost/program_options.hpp> */
 #undef HAVE_BOOST_PROGRAM_OPTIONS_HPP
+
+/* Defined if the Boost serialization library is available */
+#undef HAVE_BOOST_SERIALIZATION
 
 /* Define to 1 if you have <boost/test/unit_test.hpp> */
 #undef HAVE_BOOST_TEST_UNIT_TEST_HPP
@@ -125,6 +134,9 @@
 
 /* Define to 1 if you have libzmq */
 #undef HAVE_LIBZMQ
+
+/* Define to 1 if you have the <lmdb.h> header file. */
+#undef HAVE_LMDB_H
 
 /* Define to 1 if you have the `localtime_r' function. */
 #undef HAVE_LOCALTIME_R
