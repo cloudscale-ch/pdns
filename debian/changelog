@@ -1,3 +1,11 @@
+pdns (4.2.0~rc1-1) experimental; urgency=medium
+
+  * New upstream version 4.2.0~rc1
+  * Ship upstream-supplied LDAP schema instead of our copy
+  * Add new ixfrdist binary package
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Sat, 27 Apr 2019 23:55:14 +0000
+
 pdns (4.2.0~alpha1-1) experimental; urgency=medium
 
   * New upstream version 4.2.0~alpha1
