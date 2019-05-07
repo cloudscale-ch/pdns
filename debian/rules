@@ -19,6 +19,9 @@ export PDNS_TEST_NO_IPV6=1
 # Backends
 backends := bind ldap pipe gmysql godbc gpgsql gsqlite3 geoip lua mydns remote random opendbx tinydns
 
+# for atomic support on armel
+LDFLAGS += -latomic
+
 # Disable systemd integration on non-linux archs
 ifeq ($(DEB_HOST_ARCH_OS),linux)
 CONFIGURE_ARGS += --enable-systemd --with-systemd=/lib/systemd/system
