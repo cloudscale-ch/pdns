@@ -1,3 +1,12 @@
+pdns (4.1.6-3) UNRELEASED; urgency=medium
+
+  * Fix Denial of service via crafted zone records (CVE-2019-10162)
+    using patch from upstream.
+  * Fix Denial of service via NOTIFY packets (CVE-2019-10163)
+    using patch from upstream.
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Fri, 21 Jun 2019 19:05:30 +0000
+
 pdns (4.1.6-2) unstable; urgency=high
 
   [ Salvatore Bonaccorso ]
