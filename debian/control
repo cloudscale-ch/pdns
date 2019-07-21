@@ -79,6 +79,7 @@ Description: Tools for DNS debugging by PowerDNS
 
 Package: pdns-ixfrdist
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends: adduser,
          ${misc:Depends},
          ${shlibs:Depends}

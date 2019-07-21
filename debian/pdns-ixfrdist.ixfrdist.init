@@ -1,0 +1,11 @@
+#!/usr/bin/env /lib/init/init-d-script
+### BEGIN INIT INFO
+# Provides:          ixfrdist
+# Required-Start:    $syslog $remote_fs
+# Required-Stop:     $syslog $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: PowerDNS IXFR Distributor
+# Description:       Debian init script to start the ixfrdist daemon.
+### END INIT INFO
+DAEMON=/usr/bin/ixfrdist
