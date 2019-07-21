@@ -7,7 +7,7 @@
 # Default-Stop:      0 1 6
 # Should-Start:      slapd
 # Should-Stop:       slapd
-# Short-Description: PowerDNS Authoritative Name Server
+# Short-Description: PowerDNS Authoritative Server
 # Description: PDNS is a versatile high performance authoritative nameser
 ### END INIT INFO
 
@@ -15,7 +15,7 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin
 BINARYPATH=/usr/bin
 SBINARYPATH=/usr/sbin
 
-ODESC="PowerDNS Authoritative Name Server"
+ODESC="PowerDNS Authoritative Server"
 DESC="$ODESC"
 NAME=pdns
 DAEMON=/usr/sbin/pdns_server
@@ -53,7 +53,7 @@ doPC()
 
 isrunning()
 {
-	doPC ping > /dev/null
+	doPC rping > /dev/null
 	return $?
 }
 
