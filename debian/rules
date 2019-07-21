@@ -1,23 +1,13 @@
 #!/usr/bin/make -f
-include /usr/share/dpkg/architecture.mk
-include /usr/share/dpkg/pkg-info.mk
-include /usr/share/dpkg/vendor.mk
-
-# Vendor and version
-version := $(DEB_VERSION).$(DEB_VENDOR)
-CXXFLAGS += -DPACKAGEVERSION='"$(version)"'
-
-# (Re-)Enable warnings
-CXXFLAGS += -Wall
 
 # Turn on all hardening flags, as we're a networked daemon.
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+# see EXAMPLES in dpkg-buildflags(1) and read /usr/share/dpkg/*
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
 
-# Avoid test failure in docker.
-export PDNS_TEST_NO_IPV6=1
-
-# Backends
-backends := bind ldap pipe gmysql godbc gpgsql gsqlite3 geoip lua mydns remote random tinydns
+# Vendor and version
+CXXFLAGS += -DPACKAGEVERSION='"$(DEB_VERSION).$(DEB_VENDOR)"'
 
 # Disable systemd integration on non-linux archs
 ifeq ($(DEB_HOST_ARCH_OS),linux)
@@ -26,12 +16,21 @@ else
 CONFIGURE_ARGS += --disable-systemd
 endif
 
+# Avoid test failure in docker.
+export PDNS_TEST_NO_IPV6=1
+
+# Backends
+backends := bind ldap pipe gmysql godbc gpgsql gsqlite3 geoip lua mydns remote random tinydns
+
 
 %:
 	dh $@
 
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f dnslabeltext.cc
+
 override_dh_auto_configure:
-	test -f pdns/dnslabeltext.cc && mv pdns/dnslabeltext.cc debian/dnslabeltext.cc.moved || true
 	dh_auto_configure -- \
 		--sysconfdir=/etc/powerdns \
 		--with-dynmodules="$(backends)" \
@@ -41,6 +40,7 @@ override_dh_auto_configure:
 		--without-protobuf \
 		--enable-unit-tests \
 		--enable-reproducible \
+		--disable-silent-rules \
 		$(CONFIGURE_ARGS)
 
 override_dh_strip:
@@ -76,8 +76,3 @@ override_dh_fixperms:
 	dh_fixperms
 	# these files often contain passwords.
 	chmod 0600 debian/pdns-server/etc/powerdns/pdns.conf
-
-# restore moved files
-override_dh_clean:
-	test -f debian/dnslabeltext.cc.moved && mv debian/dnslabeltext.cc.moved pdns/dnslabeltext.cc || true
-	dh_clean
