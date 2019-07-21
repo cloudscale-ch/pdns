@@ -3,9 +3,11 @@ exec 2>&1
 set -ex
 
 PGVERSION=$(basename $(find /etc/postgresql -maxdepth 1 -mindepth 1 -type d -print))
+# try manually controlling postgres daemon, as in the testbed we probably do
+# not have a working init/service manager.
 service postgresql stop || true
-
 trap "pg_ctlcluster --skip-systemctl-redirect $PGVERSION main stop" EXIT TERM INT
+pg_ctlcluster --skip-systemctl-redirect $PGVERSION main stop || true
 pg_ctlcluster --skip-systemctl-redirect $PGVERSION main start
 
 DBNAME=pdns
