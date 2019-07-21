@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "DNSWASHER" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "DNSWASHER" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 dnswasher \- A PowerDNS nameserver debugging tool
 .
@@ -49,7 +49,11 @@ individuals to be re\-identified based on the domain names they care
 about.
 .SH OPTIONS
 .sp
-None
+\-\-decrypt,\-d             Undo IPCipher encryption of IP addresses
+\-\-help, \-h               Show summary of options.
+\-\-key,\-k                 Base64 encoded 128\-bit key for IPCipher
+\-\-passphrase,\-p          Passphrase that will be used to derive an IPCipher key
+\-\-version,\-v             Output version
 .SH SEE ALSO
 .sp
 pcap(3PCAP), tcpdump(8)

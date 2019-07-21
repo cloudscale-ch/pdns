@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "PDNS_CONTROL" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "PDNS_CONTROL" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 pdns_control \- Control the PowerDNS nameserver
 .
@@ -67,19 +67,19 @@ Where the controlsocket lives.
 .SH COMMANDS
 .SS bind\-add\-zone \fIDOMAIN\fP \fIFILENAME\fP
 .sp
-When using the bindbackend, add a zone. This zone is added in\-memory
+When using the BIND backend, add a zone. This zone is added in\-memory
 and served immediately. Note that this does not add the zone to the
 bind\-config file. \fIFILENAME\fP must be an absolute path.
 .SS bind\-domain\-status [\fIDOMAIN\fP\&...]
 .sp
-When using the bindbackend, list status of all domains. Optionally,
+When using the BIND backend, list status of all domains. Optionally,
 append \fIDOMAIN\fPs to get the status of specific zones.
 .SS bind\-list\-rejects
 .sp
-When using the bindbackend, get a list of all rejected domains.
+When using the BIND backend, get a list of all rejected domains.
 .SS bind\-reload\-now \fIDOMAIN\fP [\fIDOMAIN\fP\&...]
 .sp
-When using the bindbackend, immediately reload \fIDOMAIN\fP from disk.
+When using the BIND backend, immediately reload \fIDOMAIN\fP from disk.
 .SS ccounts
 .sp
 Show the content of the cache.
@@ -131,7 +131,7 @@ Tell a running pdns_server to quit.
 .SS rediscover
 .sp
 Instructs backends that new domains may have appeared in the
-database, or, in the case of the Bind backend, in named.conf.
+database, or, in the case of the BIND backend, in named.conf.
 .SS reload
 .sp
 Instruct the server to reload all its zones, this will not add new

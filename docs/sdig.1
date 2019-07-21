@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "SDIG" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "SDIG" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 sdig \- Perform a DNS query and show the results
 .
@@ -32,32 +32,41 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-\fBsdig\fP \fIIPADDRESS\fP \fIPORT\fP \fIQNAME\fP \fIQTYPE\fP [\fIOPTION\fP]
+\fBsdig\fP \fIIP\-ADDRESS\-OR\-DOH\-URL * *PORT\fP \fIQNAME\fP \fIQTYPE\fP [\fIOPTION\fP]
 .SH DESCRIPTION
 .sp
-\fBsdig\fP sends a DNS query to \fIIPADDRESS\fP on port \fIPORT\fP and displays
+\fBsdig\fP sends a DNS query to \fIIP\-ADDRESS\-OR\-DOH\-URL\fP on port \fIPORT\fP and displays
 the answer in a formatted way.
+If the address starts with an \fBh\fP, it is assumed to be a DoH endpoint, and \fIPORT\fP is ignored.
 .SH OPTIONS
 .sp
-These options can be added to the commandline in any order. dnssec : Set
-the DO bit to request DNSSEC information.
+These options can be added to the commandline in any order.
 .INDENT 0.0
+.TP
+.B dnssec
+Set the DO bit to request DNSSEC information.
+.TP
+.B ednssubnet \fISUBNET\fP
+Send \fISUBNET\fP in the edns\-client\-subnet option. If this option is
+not set, no edns\-client\-subnet option is set in the query.
 .TP
 .B hidesoadetails
 Don\(aqt show the SOA serial in the response.
+.TP
+.B hidettl
+Replace TTLs with \fI[ttl]\fP in the response.
 .TP
 .B recurse
 Set the RD bit in the question.
 .TP
 .B showflags
-Show the NSEC3 flags in the response.
+Show the NSEC3 flags in the response (they are hidden by default).
 .TP
 .B tcp
 Use TCP instead of UDP to send the query.
 .TP
-.B ednssubnet \fISUBNET\fP
-Send \fISUBNET\fP in the edns\-client\-subnet option. If this option is
-not set, no edns\-client\-subnet option is set in the query.
+.B xpf \fIXPFCODE\fP \fIXPFVERSION\fP \fIXPFPROTO\fP \fIXPFSRC\fP \fIXPFSRC\fP
+Send an \fIXPF\fP additional with these parameters.
 .UNINDENT
 .SH AUTHOR
 PowerDNS.COM BV

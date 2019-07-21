@@ -105,6 +105,9 @@
 /* Define to 1 if you have ldap_sasl_bind */
 #undef HAVE_LDAP_SASL_BIND
 
+/* Define to 1 if you have OpenSSL libcrypto */
+#undef HAVE_LIBCRYPTO
+
 /* define to 1 if OpenSSL ecdsa support is available. */
 #undef HAVE_LIBCRYPTO_ECDSA
 

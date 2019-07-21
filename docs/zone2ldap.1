@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "ZONE2LDAP" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "ZONE2LDAP" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 zone2ldap \- convert zonefiles to ldif
 .
@@ -35,7 +35,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 \fBzone2ldap\fP {\fB\-\-named\-conf=\fP\fIPATH\fP,\fB\-\-zone\-file=\fP\fIPATH\fP \fB\-\-zone\-name=\fP\fINAME\fP} [\fIOPTION\fP]...
 .SH DESCRIPTION
 .sp
-\fBzone2ldap\fP is a program that converts bind zonefiles to ldif format
+\fBzone2ldap\fP is a program that converts BIND zonefiles to ldif format
 which can inserted to an LDAP server.
 .SH OPTIONS
 .INDENT 0.0
@@ -53,7 +53,7 @@ Add dnsttl attribute to every entry
 How to arrange entries in the directory ("simple" or "tree")
 .TP
 .BI \-\-named\-conf\fB= <PATH>
-Path to a Bind named.conf to parse
+Path to a BIND named.conf to parse
 .TP
 .B \-\-resume
 Continue after errors
