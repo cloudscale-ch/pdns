@@ -1,6 +1,7 @@
 usr/bin/calidns
 usr/bin/dnsbulktest
 usr/bin/dnsgram
+usr/bin/dnspcap2calidns
 usr/bin/dnsreplay
 usr/bin/dnsscan
 usr/bin/dnsscope
@@ -13,3 +14,4 @@ usr/bin/nsec3dig
 usr/bin/pdns_notify
 usr/bin/saxfr
 usr/bin/sdig
+usr/bin/stubquery
