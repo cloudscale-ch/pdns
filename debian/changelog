@@ -1,3 +1,26 @@
+pdns (4.2.0~rc2-1) experimental; urgency=medium
+
+  * New upstream version 4.2.0~rc2 (Closes: #918661, #916408)
+  * Bump Standards-Version to 4.4.0
+  * Use debhelper-compat v12
+  * Revert "Link with libatomic.so to fix build failure on armel"
+  * Ship DEP12 UpstreamMetadata per user request
+  * Remove pdns-backend-opendbx.
+    OpenDBX is unmaintained in Debian and possibly upstream, too.
+  * Use pdns_control rping in init script.
+    Makes the init script useful on systemd systems, too. (Closes: #876775)
+  * autopkgtests: add more guessed workarounds for debci
+  * Build-Depend on systemd for proper version detection
+  * Remove preinst code for upgrades from before 4.0.0-3
+  * Remove ddeb/dbgsym breaks, from before 4.0.0
+  * d/control: simplify Build-Depends and remove old Breaks/Replaces
+  * d/rules: simplify and sync with dnsdist, pdns-recursor
+  * pdns-ixfrdist: Add ixfrdist init script
+  * backends: take schema files from `make install` location
+  * pdns-tools: install dnspcap2calidns, stubquery
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Sun, 21 Jul 2019 20:59:16 +0000
+
 pdns (4.2.0~rc1-2) experimental; urgency=medium
 
   * Link with libatomic.so to fix build failure on armel
