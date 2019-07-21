@@ -1,2 +1,2 @@
-modules/gmysqlbackend/*.sql usr/share/pdns-backend-mysql/schema
 usr/lib/*/pdns/libgmysqlbackend.so*
+usr/share/doc/pdns/*.mysql.sql usr/share/pdns-backend-mysql/schema
