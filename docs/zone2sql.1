@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "ZONE2SQL" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "ZONE2SQL" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 zone2sql \- convert BIND zones to SQL
 .
@@ -35,10 +35,10 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 \fBzone2sql\fP {\fB\-\-named\-conf=\fP\fIPATH\fP,\fB\-\-zone\-file=\fP\fIPATH\fP [\fB\-\-zone\-name=\fP\fINAME\fP]} [\fIOptions\fP]
 .SH DESCRIPTION
 .sp
-\fBzone2sql\fP parses Bind named.conf files and zonefiles and outputs SQL
+\fBzone2sql\fP parses BIND named.conf files and zonefiles and outputs SQL
 on standard out, which can then be fed to your database.
 .sp
-\fBzone2sql\fP understands the Bind master file extension \fB$GENERATE\fP
+\fBzone2sql\fP understands the BIND master file extension \fB$GENERATE\fP
 and will also honour \fB$ORIGIN\fP and \fB$TTL\fP\&.
 .sp
 For backends supporting slave operation there is also an option to keep
@@ -51,7 +51,7 @@ Generic SQLite3 and Generic Oracle backends.
 .INDENT 0.0
 .TP
 .BI \-\-named\-conf\fB= <PATH>
-Read \fIPATH\fP to get the bind configuration
+Read \fIPATH\fP to get the BIND configuration
 .TP
 .BI \-\-zone\fB= <PATH>
 Parse only the zone file at \fIPATH\fP Conflicts with \fB\-\-named\-conf\fP parameter.

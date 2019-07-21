@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "PDNSUTIL" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "PDNSUTIL" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 pdnsutil \- PowerDNS record and DNSSEC command and control
 .
@@ -108,6 +108,9 @@ Deactivate all keys and unset PRESIGNED in \fIZONE\fP\&.
 Export to standard output DNSKEY and DS of key with key id \fIKEY\-ID\fP
 within zone called \fIZONE\fP\&.
 .TP
+.B export\-zone\-ds \fIZONE\fP
+Export to standard output all KSK DS records for \fIZONE\fP\&.
+.TP
 .B export\-zone\-key \fIZONE\fP \fIKEY\-ID\fP
 Export to standard output full (private) key with key id \fIKEY\-ID\fP
 within zone called \fIZONE\fP\&. The format used is compatible with BIND
@@ -130,7 +133,7 @@ the added key.
 .B remove\-zone\-key \fIZONE\fP \fIKEY\-ID\fP
 Remove a key with id \fIKEY\-ID\fP from a zone called \fIZONE\fP\&.
 .TP
-set\-nsec3 \fIZONE\fP \(aq\fIHASH\-ALGORITHM\fP \fIFLAGS\fP \fIITERATIONS\fP \fISALT\fP\(aq [\fBnarrow\fP]
+set\-nsec3 \fIZONE\fP [\(aq\fIHASH\-ALGORITHM\fP \fIFLAGS\fP \fIITERATIONS\fP \fISALT\fP\(aq] [\fBnarrow\fP]
 Sets NSEC3 parameters for this zone. The quoted parameters are 4
 values that are used for the the NSEC3PARAM record and decide how
 NSEC3 records are created. The NSEC3 parameters must be quoted on
@@ -138,14 +141,18 @@ the command line. \fIHASH\-ALGORITHM\fP must be 1 (SHA\-1). Setting
 \fIFLAGS\fP to 1 enables NSEC3 opt\-out operation. Only do this if you
 know you need it. For \fIITERATIONS\fP, please consult RFC 5155, section
 10.3. And be aware that a high number might overload validating
-resolvers. The \fISALT\fP is a hexadecimal string encoding the bits for
-the salt, or \- to use no salt. Setting \fBnarrow\fP will make PowerDNS
-send out "white lies" about the next secure record. Instead of
-looking it up in the database, it will send out the hash + 1 as the
-next secure record. A sample commandline is: "pdnsutil set\-nsec3
-powerdnssec.org \(aq1 1 1 ab\(aq narrow". \fBWARNING\fP: If running in
-RSASHA1 mode (algorithm 5 or 7), switching from NSEC to NSEC3 will
-require a DS update in the parent zone.
+resolvers and that a limit can be set with \fBmax\-nsec3\-iterations\fP
+in \fBpdns.conf\fP\&. The \fISALT\fP is a hexadecimal string encoding the bits
+for the salt, or \- to use no salt. Setting \fBnarrow\fP will make PowerDNS
+send out "white lies" (RFC 7129) about the next secure record to
+prevent zone enumeration. Instead of looking it up in the database,
+it will send out the hash + 1 as the next secure record. Narrow mode
+requires online signing capabilities by the nameserver and therefore
+zone transfers are denied. If only the zone is provided as argument,
+the 4\-parameter quoted string defaults to \fB\(aq1 0 1 ab\(aq\fP\&. A sample
+commandline is: \fBpdnsutil set\-nsec3 powerdnssec.org \(aq1 1 1 ab\(aq narrow\fP\&.
+\fBWARNING\fP: If running in RSASHA1 mode (algorithm 5 or 7), switching
+from NSEC to NSEC3 will require a DS update in the parent zone.
 .TP
 .B unset\-nsec3 \fIZONE\fP
 Converts \fIZONE\fP to NSEC operations. \fBWARNING\fP: If running in
@@ -236,6 +243,9 @@ Check zone \fIZONE\fP for correctness.
 Clear the records in zone \fIZONE\fP, but leave actual domain and
 settings unchanged
 .TP
+.B delete\-rrset \fIZONE\fP \fINAME\fP \fITYPE\fP
+Delete named RRSET from zone.
+.TP
 .B delete\-zone \fIZONE\fP:
 Delete the zone named \fIZONE\fP\&.
 .TP
@@ -275,6 +285,9 @@ migrated data. Can always safely be run, it does no harm.
 Calculates the \(aqordername\(aq and \(aqauth\(aq fields for all zones so they
 comply with DNSSEC settings. Can be used to fix up migrated data.
 Can always safely be run, it does no harm.
+.TP
+.B replace\-rrset \fIZONE\fP \fINAME\fP \fITYPE\fP [\fITTL\fP] \fICONTENT\fP [\fICONTENT\fP\&..]
+Replace existing \fINAME\fP in zone \fIZONE\fP with a new set.
 .TP
 .B secure\-zone \fIZONE\fP
 Configures a zone called \fIZONE\fP with reasonable DNSSEC settings. You
@@ -325,6 +338,15 @@ careful!
 Perform a benchmark of the backend\-database.
 \fIFILE\fP can be a file with a list, one per line, of domain names to use for this.
 If \fIFILE\fP is not specified, powerdns.com is used.
+.UNINDENT
+.SH OTHER TOOLS
+.INDENT 0.0
+.TP
+.B ipencrypt \fIIP\-ADDRESS\fP passsword
+Encrypt an IP address according to the \(aqipcipher\(aq standard
+.TP
+.B ipdecrypt \fIIP\-ADDRESS\fP passsword
+Encrypt an IP address according to the \(aqipcipher\(aq standard
 .UNINDENT
 .SH SEE ALSO
 .sp

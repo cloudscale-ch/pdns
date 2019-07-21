@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "DUMRESP" "1" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "DUMRESP" "1" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 dumresp \- A dumb DNS responder
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-\fBdumresp\fP \fILOCAL\-ADDRESS\fP \fILOCAL\-PORT\fP \fINUMBER\-OF\-PROCESSES\fP
+\fBdumresp\fP \fILOCAL\-ADDRESS\fP \fILOCAL\-PORT\fP \fINUMBER\-OF\-PROCESSES\fP [tcp]
 .SH DESCRIPTION
 .sp
 \fBdumresp\fP accepts DNS packets on \fILOCAL\-ADDRESS\fP:\fILOCAL\-PORT\fP and
@@ -42,7 +42,8 @@ simply replies with the same query, with the QR bit set. When
 the port.
 .SH OPTIONS
 .sp
-None
+tcp: Whether to listen and accept TCP connections in addition to
+UDP packets. Defaults to false.
 .SH SEE ALSO
 .sp
 socket(7)

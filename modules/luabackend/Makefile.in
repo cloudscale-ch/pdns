@@ -106,6 +106,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_pthread_set_name.m4 \
 	$(top_srcdir)/m4/pdns_check_libcrypto.m4 \
 	$(top_srcdir)/m4/pdns_check_libcrypto_ecdsa.m4 \
 	$(top_srcdir)/m4/pdns_check_libcrypto_eddsa.m4 \
+	$(top_srcdir)/m4/pdns_check_libcurl.m4 \
 	$(top_srcdir)/m4/pdns_check_lmdb.m4 \
 	$(top_srcdir)/m4/pdns_check_lua_hpp.m4 \
 	$(top_srcdir)/m4/pdns_check_network_libs.m4 \
@@ -126,6 +127,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_pthread_set_name.m4 \
 	$(top_srcdir)/m4/pdns_enable_remotebackend_zeromq.m4 \
 	$(top_srcdir)/m4/pdns_enable_reproducible.m4 \
 	$(top_srcdir)/m4/pdns_enable_sanitizers.m4 \
+	$(top_srcdir)/m4/pdns_enable_tools.m4 \
 	$(top_srcdir)/m4/pdns_enable_unit_tests.m4 \
 	$(top_srcdir)/m4/pdns_enable_verbose_logging.m4 \
 	$(top_srcdir)/m4/pdns_from_git.m4 \
@@ -334,6 +336,8 @@ INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+IPCRYPT_CFLAGS = @IPCRYPT_CFLAGS@
+IPCRYPT_LIBS = @IPCRYPT_LIBS@
 KRB5_LIBS = @KRB5_LIBS@
 LD = @LD@
 LDAP_LIBS = @LDAP_LIBS@

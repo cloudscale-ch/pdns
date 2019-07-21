@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "IXFRDIST.YML" "5" "Mar 19, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "IXFRDIST.YML" "5" "Jun 13, 2019" "4.2" "PowerDNS Authoritative Server"
 .SH NAME
 ixfrdist.yml \- The ixfrdist configuration file
 .
@@ -146,6 +146,24 @@ When not set, no webserver is started.
 A list of networks that are allowed to access the \fBixfrdist\fP webserver.
 Entries without a netmask will be interpreted as a single address.
 By default, this list is set to \fB127.0.0.0/8\fP and \fB::1/128\fP\&.
+.TP
+.B webserver\-loglevel
+How much the webserver should log: \(aqnone\(aq, \(aqnormal\(aq or \(aqdetailed\(aq.
+When logging, each log\-line contains the UUID of the request, this allows finding errors caused by certain requests.
+With \(aqnone\(aq, nothing is logged except for errors.
+With \(aqnormal\(aq (the default), one line per request is logged in the style of the common log format:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+[NOTICE] [webserver] 46326eef\-b3ba\-4455\-8e76\-15ec73879aa3 127.0.0.1:57566 "GET /metrics HTTP/1.1" 200 1846
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+with \(aqdetailed\(aq, the full requests and responses (including headers) are logged along with the regular log\-line from \(aqnormal\(aq.
 .UNINDENT
 .SH SEE ALSO
 .sp
