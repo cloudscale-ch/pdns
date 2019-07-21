@@ -1,0 +1,2 @@
+# Multiple instances will not be supported under sysvinit.
+pdns-ixfrdist: package-supports-alternative-init-but-no-init.d-script lib/systemd/system/ixfrdist@.service
