@@ -103,8 +103,6 @@ Depends: pdns-server (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Provides: pdns-backend
-Replaces: pdns-server (<< 4.0.0-2~)
-Breaks: pdns-server (<< 4.0.0-2~)
 Description: BIND backend for PowerDNS
  PowerDNS is a versatile nameserver which supports a large number
  of different backends ranging from simple zonefiles to relational
