@@ -16,6 +16,7 @@ Build-Depends: bison,
                libgeoip-dev,
                libkrb5-dev,
                libldap2-dev,
+               liblmdb-dev,
                liblua5.3-dev,
                libmaxminddb-dev,
                libpq-dev,
@@ -134,6 +135,20 @@ Description: LDAP backend for PowerDNS
  PowerDNS tries to emphasize speed and security.
  .
  This package contains the LDAP backend for the PowerDNS nameserver.
+
+#Package: pdns-backend-lmdb
+#Architecture: any
+#Depends: pdns-server (= ${binary:Version}),
+#         ${misc:Depends},
+#         ${shlibs:Depends}
+#Provides: pdns-backend
+#Description: LMDB backend for PowerDNS
+# PowerDNS is a versatile nameserver which supports a large number
+# of different backends ranging from simple zonefiles to relational
+# databases and load balancing/failover algorithms.
+# PowerDNS tries to emphasize speed and security.
+# .
+# This package contains the LMDB backend for the PowerDNS nameserver.
 
 Package: pdns-backend-geoip
 Architecture: any
