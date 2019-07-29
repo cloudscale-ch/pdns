@@ -19,7 +19,7 @@ launch=lmdb
 lmdb-filename=./pdns.lmdb
 EOF
 
-pdnsutil --config-dir=. create-zone smoke.lmdb.example.org
+../../pdns/pdnsutil --config-dir=. create-zone smoke.lmdb.example.org
 
 ./launch-pdns
 
