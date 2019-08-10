@@ -150,6 +150,7 @@ void declareArguments()
   ::arg().set("webserver-password","Password required for accessing the webserver")="";
   ::arg().set("webserver-allow-from","Webserver/API access is only allowed from these subnets")="127.0.0.1,::1";
   ::arg().set("webserver-loglevel", "Amount of logging in the webserver (none, normal, detailed)") = "normal";
+  ::arg().set("webserver-max-bodysize","Webserver/API maximum request/response body size in megabytes")="2";
 
   ::arg().setSwitch("do-ipv6-additional-processing", "Do AAAA additional processing")="yes";
   ::arg().setSwitch("query-logging","Hint backends that queries should be logged")="no";
@@ -245,6 +246,11 @@ static uint64_t getSysUserTimeMsec(const std::string& str)
 
 }
 
+static uint64_t getTCPConnectionCount(const std::string& str)
+{
+  return TN->numTCPConnections();
+}
+
 static uint64_t getQCount(const std::string& str)
 try
 {
@@ -304,7 +310,8 @@ void declareStats(void)
   
   S.declare("tcp6-queries","Number of IPv6 TCP queries received");
   S.declare("tcp6-answers","Number of IPv6 answers sent out over TCP");
-    
+
+  S.declare("open-tcp-connections","Number of currently open TCP connections", getTCPConnectionCount);;
 
   S.declare("qsize-q","Number of questions waiting for database attention", getQCount);
 
@@ -437,7 +444,7 @@ try
       g_log<<": ";
     }
 
-    if((P->d.opcode != Opcode::Notify && P->d.opcode != Opcode::Update) && P->couldBeCached()) {
+    if(PC.enabled() && (P->d.opcode != Opcode::Notify && P->d.opcode != Opcode::Update) && P->couldBeCached()) {
       bool haveSomething=PC.get(P, &cached); // does the PacketCache recognize this question?
       if (haveSomething) {
         if(logDNSQueries)
@@ -463,7 +470,7 @@ try
       continue;
     }
         
-    if(logDNSQueries) 
+    if(PC.enabled() && logDNSQueries)
       g_log<<"packetcache MISS"<<endl;
 
     try {

@@ -46,6 +46,8 @@
 
 #include "lmdbbackend.hh"
 
+#define SCHEMAVERSION 1
+
 LMDBBackend::LMDBBackend(const std::string& suffix)
 {
   setArgPrefix("lmdb"+suffix);
@@ -70,6 +72,16 @@ LMDBBackend::LMDBBackend(const std::string& suffix)
   
   auto pdnsdbi = d_tdomains->getEnv()->openDB("pdns", MDB_CREATE);
   auto txn = d_tdomains->getEnv()->getRWTransaction();
+  MDBOutVal _schemaversion;
+  if(!txn.get(pdnsdbi, "schemaversion", _schemaversion)) {
+    auto schemaversion = _schemaversion.get<uint32_t>();
+    if (schemaversion != SCHEMAVERSION) {
+      throw std::runtime_error("Expected LMDB schema version "+std::to_string(SCHEMAVERSION)+" but got "+std::to_string(schemaversion));
+    }
+  }
+  else {
+    txn.put(pdnsdbi, "schemaversion", SCHEMAVERSION);
+  }
   MDBOutVal shards;
   if(!txn.get(pdnsdbi, "shards", shards)) {
     
@@ -81,9 +93,9 @@ LMDBBackend::LMDBBackend(const std::string& suffix)
   else {
     d_shards = atoi(getArg("shards").c_str());
     txn.put(pdnsdbi, "shards", d_shards);
-    txn.commit();
   }
-    d_trecords.resize(d_shards);
+  txn.commit();
+  d_trecords.resize(d_shards);
   d_dolog = ::arg().mustDo("query-logging");
 }
 
@@ -535,17 +547,13 @@ void LMDBBackend::lookup(const QType &type, const DNSName &qdomain, DNSPacket *p
     d_dtime.set();
   }
   DNSName hunt(qdomain);
+  DomainInfo di;
   if(zoneId < 0) {
     auto rotxn = d_tdomains->getROTransaction();
     
-    for(;;) {
-      DomainInfo di;
-      if((zoneId = rotxn.get<0>(hunt, di))) {
-        break;
-      }
-      if(!hunt.chopOff())
-        break;
-    }
+    do {
+      zoneId = rotxn.get<0>(hunt, di);
+    } while (!zoneId && type != QType::SOA && hunt.chopOff());
     if(zoneId <= 0) {
       //      cout << "Did not find zone for "<< qdomain<<endl;
       d_getcursor.reset();
@@ -553,7 +561,6 @@ void LMDBBackend::lookup(const QType &type, const DNSName &qdomain, DNSPacket *p
     }
   }
   else {
-    DomainInfo di;
     if(!d_tdomains->getROTransaction().get(zoneId, di)) {
       // cout<<"Could not find a zone with id "<<zoneId<<endl;
       d_getcursor.reset();

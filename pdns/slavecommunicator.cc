@@ -91,8 +91,13 @@ void CommunicatorClass::ixfrSuck(const DNSName &domain, const TSIGTriplet& tt, c
   try {
     DNSSECKeeper dk (&B); // reuse our UeberBackend copy for DNSSECKeeper
 
-    if(!B.getDomainInfo(domain, di) || !di.backend || di.kind != DomainInfo::Slave) { // di.backend and B are mostly identical
-      g_log<<Logger::Error<<"Can't determine backend for domain '"<<domain<<"'"<<endl;
+    bool wrongDomainKind = false;
+    // this checks three error conditions, and sets wrongDomainKind if we hit the third & had an error
+    if(!B.getDomainInfo(domain, di) || !di.backend || (wrongDomainKind = true, di.kind != DomainInfo::Slave)) { // di.backend and B are mostly identical
+      if(wrongDomainKind)
+        g_log<<Logger::Error<<"Can't determine backend for domain '"<<domain<<"', not configured as slave"<<endl;
+      else
+        g_log<<Logger::Error<<"Can't determine backend for domain '"<<domain<<"'"<<endl;
       return;
     }
 
@@ -307,9 +312,13 @@ void CommunicatorClass::suck(const DNSName &domain, const ComboAddress& remote)
   bool transaction=false;
   try {
     DNSSECKeeper dk (&B); // reuse our UeberBackend copy for DNSSECKeeper
-
-    if(!B.getDomainInfo(domain, di) || !di.backend || di.kind != DomainInfo::Slave) { // di.backend and B are mostly identical
-      g_log<<Logger::Error<<"Can't determine backend for domain '"<<domain<<"'"<<endl;
+    bool wrongDomainKind = false;
+    // this checks three error conditions & sets wrongDomainKind if we hit the third
+    if(!B.getDomainInfo(domain, di) || !di.backend || (wrongDomainKind = true, di.kind != DomainInfo::Slave)) { // di.backend and B are mostly identical
+      if(wrongDomainKind)
+        g_log<<Logger::Error<<"Can't determine backend for domain '"<<domain<<"', not configured as slave"<<endl;
+      else
+        g_log<<Logger::Error<<"Can't determine backend for domain '"<<domain<<"'"<<endl;
       return;
     }
     ZoneStatus zs;
@@ -591,7 +600,7 @@ void CommunicatorClass::suck(const DNSName &domain, const ComboAddress& remote)
 
     g_log<<Logger::Error<<"AXFR done for '"<<domain<<"', zone committed with serial number "<<zs.soa_serial<<endl;
     if(::arg().mustDo("slave-renotify"))
-      notifyDomain(domain);
+      notifyDomain(domain, &B);
   }
   catch(DBException &re) {
     g_log<<Logger::Error<<"Unable to feed record during incoming AXFR of '" << domain<<"': "<<re.reason<<endl;
@@ -938,7 +947,7 @@ void CommunicatorClass::slaveRefresh(PacketHandler *P)
     else if(hasSOA && theirserial == ourserial) {
       uint32_t maxExpire=0, maxInception=0;
       if(dk.isPresigned(di.zone)) {
-        B->lookup(QType(QType::RRSIG), di.zone); // can't use DK before we are done with this lookup!
+        B->lookup(QType(QType::RRSIG), di.zone, nullptr, di.id); // can't use DK before we are done with this lookup!
         DNSZoneRecord zr;
         while(B->get(zr)) {
           auto rrsig = getRR<RRSIGRecordContent>(zr.dr);

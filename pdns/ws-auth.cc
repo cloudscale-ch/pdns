@@ -78,6 +78,8 @@ AuthWebServer::AuthWebServer() :
     acl.toMasks(::arg()["webserver-allow-from"]);
     d_ws->setACL(acl);
 
+    d_ws->setMaxBodySize(::arg().asNum("webserver-max-bodysize"));
+
     d_ws->bind();
   }
 }
@@ -336,6 +338,7 @@ static Json::object getZoneInfo(const DomainInfo& di, DNSSECKeeper *dk) {
     { "account", di.account },
     { "masters", masters },
     { "serial", (double)di.serial },
+    { "edited_serial", (double)calculateEditSOA(di.serial, *dk, di.zone) },
     { "notified_serial", (double)di.notified_serial },
     { "last_check", (double)di.last_check }
   };
@@ -1816,7 +1819,7 @@ static void apiServerZoneNotify(HttpRequest* req, HttpResponse* resp) {
     throw HttpNotFoundException();
   }
 
-  if(!Communicator.notifyDomain(zonename))
+  if(!Communicator.notifyDomain(zonename, &B))
     throw ApiException("Failed to add to the queue - see server log");
 
   resp->setSuccessResult("Notification queued");
@@ -2009,7 +2012,7 @@ static void patchZone(HttpRequest* req, HttpResponse* resp) {
 
         if (replace_records) {
           bool ent_present = false;
-          di.backend->lookup(QType(QType::ANY), qname);
+          di.backend->lookup(QType(QType::ANY), qname, nullptr, di.id);
           DNSResourceRecord rr;
           while (di.backend->get(rr)) {
             if (rr.qtype.getCode() == QType::ENT) {

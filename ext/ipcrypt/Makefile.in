@@ -367,6 +367,7 @@ SHELL = @SHELL@
 SQLITE3_CFLAGS = @SQLITE3_CFLAGS@
 SQLITE3_LIBS = @SQLITE3_LIBS@
 STRIP = @STRIP@
+SYSTEMCTL = @SYSTEMCTL@
 SYSTEMD_CFLAGS = @SYSTEMD_CFLAGS@
 SYSTEMD_DIR = @SYSTEMD_DIR@
 SYSTEMD_LIBS = @SYSTEMD_LIBS@
@@ -444,6 +445,9 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+EXTRA_DIST = \
+	LICENSE
+
 noinst_LTLIBRARIES = libipcrypt.la
 libipcrypt_la_SOURCES = \
 	ipcrypt.c \
