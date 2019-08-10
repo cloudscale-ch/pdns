@@ -161,7 +161,7 @@ public:
     d_nsock6 = -1;
     d_preventSelfNotification = false;
   }
-  time_t doNotifications();    
+  time_t doNotifications(PacketHandler *P);
   void go();
   
   
@@ -173,7 +173,7 @@ public:
   void notify(const DNSName &domain, const string &ip);
   void mainloop();
   void retrievalLoopThread();
-  void sendNotification(int sock, const DNSName &domain, const ComboAddress& remote, uint16_t id);
+  void sendNotification(int sock, const DNSName &domain, const ComboAddress& remote, uint16_t id, UeberBackend* B);
 
   static void *launchhelper(void *p)
   {
@@ -185,7 +185,7 @@ public:
     static_cast<CommunicatorClass *>(p)->retrievalLoopThread();
     return 0;
   }
-  bool notifyDomain(const DNSName &domain);
+  bool notifyDomain(const DNSName &domain, UeberBackend* B);
 private:
   void loadArgsIntoSet(const char *listname, set<string> &listset);
   void makeNotifySockets();
@@ -251,32 +251,18 @@ private:
 class FindNS
 {
 public:
-  vector<string> lookup(const DNSName &name, UeberBackend *b, const DNSName& zone)
+  vector<string> lookup(const DNSName &name, UeberBackend *b)
   {
     vector<string> addresses;
 
     this->resolve_name(&addresses, name);
     
     if(b) {
-      b->lookup(QType(QType::ANY),name);
-      while (true) {
-        try {
-          DNSZoneRecord rr;
-          if (!b->get(rr))
-            break;
-          if (rr.dr.d_type == QType::A || rr.dr.d_type == QType::AAAA)
+        b->lookup(QType(QType::ANY),name);
+        DNSZoneRecord rr;
+        while(b->get(rr))
+          if(rr.dr.d_type == QType::A || rr.dr.d_type==QType::AAAA)
             addresses.push_back(rr.dr.d_content->getZoneRepresentation());   // SOL if you have a CNAME for an NS
-        }
-        // After an exception, b can be inconsistent so break
-        catch (PDNSException &ae) {
-          g_log << Logger::Error << "Could not lookup address for nameserver " << name << " in zone " << zone << ", cannot notify: " << ae.reason << endl;
-          break;
-        }
-        catch (std::exception &e) {
-          g_log << Logger::Error << "Could not lookup address for nameserver " << name << " in zone " << zone << ", cannot notify: " << e.what() << endl;
-          break;
-        }
-      }
     }
     return addresses;
   }

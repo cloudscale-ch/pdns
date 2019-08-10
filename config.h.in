@@ -211,6 +211,9 @@
 /* Define to 1 if __sanitizer_finish_switch_fiber takes three pointers */
 #undef HAVE_SANITIZER_FINISH_SWITCH_FIBER_THREE_PTRS
 
+/* Define to 1 if you have the `sched_setscheduler' function. */
+#undef HAVE_SCHED_SETSCHEDULER
+
 /* Define to 1 if you have the `sendmmsg' function. */
 #undef HAVE_SENDMMSG
 
