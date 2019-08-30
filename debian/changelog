@@ -1,3 +1,14 @@
+pdns (4.2.0-1) unstable; urgency=medium
+
+  * New upstream version 4.2.0, upload to unstable.
+  * pdns-backend-sqlite3: ensure default database path is writable.
+    Needed for WAL mode.
+  * d/copyright: Update
+  * Build, but do not actually ship new LMDB backend
+  * Qualify built binaries at build time
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Fri, 30 Aug 2019 10:53:16 +0000
+
 pdns (4.2.0~rc2-1) experimental; urgency=medium
 
   * New upstream version 4.2.0~rc2 (Closes: #918661, #916408)
