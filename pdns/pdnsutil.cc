@@ -391,12 +391,16 @@ int checkZone(DNSSECKeeper &dk, UeberBackend &B, const DNSName& zone, const vect
 
     content.str("");
     content<<rr.qname<<" "<<rr.qtype.getName()<<" "<<rr.content;
-    if (recordcontents.count(toLower(content.str()))) {
+    string contentstr = content.str();
+    if (rr.qtype.getCode() != QType::TXT) {
+      contentstr=toLower(contentstr);
+    }
+    if (recordcontents.count(contentstr)) {
       cout<<"[Error] Duplicate record found in rrset: '"<<rr.qname<<" IN "<<rr.qtype.getName()<<" "<<rr.content<<"'"<<endl;
       numerrors++;
       continue;
     } else
-      recordcontents.insert(toLower(content.str()));
+      recordcontents.insert(contentstr);
 
     content.str("");
     content<<rr.qname<<" "<<rr.qtype.getName();
@@ -1246,11 +1250,11 @@ int addOrReplaceRecord(bool addOrReplace, const vector<string>& cmds) {
   di.backend->replaceRRSet(di.id, name, rr.qtype, newrrs);
   // need to be explicit to bypass the ueberbackend cache!
   di.backend->lookup(rr.qtype, name, 0, di.id);
-  di.backend->commitTransaction();
   cout<<"New rrset:"<<endl;
   while(di.backend->get(rr)) {
     cout<<rr.qname.toString()<<" "<<rr.ttl<<" IN "<<rr.qtype.getName()<<" "<<rr.content<<endl;
   }
+  di.backend->commitTransaction();
   return EXIT_SUCCESS;
 }
 
