@@ -19,8 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef PDNS_DNSPROXY
-#define PDNS_DNSPROXY
+#pragma once
 #include <pthread.h>
 #include <map>
 #include <sys/socket.h>
@@ -54,7 +53,7 @@ public:
   DNSProxy(const string &ip); //!< creates socket
   ~DNSProxy(); //<! dtor for DNSProxy
   void go(); //!< launches the actual thread
-  bool completePacket(DNSPacket *r, const DNSName& target,const DNSName& aname, const uint8_t scopeMask);
+  bool completePacket(std::unique_ptr<DNSPacket>& r, const DNSName& target,const DNSName& aname, const uint8_t scopeMask);
 
   void mainloop();                  //!< this is the main loop that receives reply packets and sends them out again
   static void *launchhelper(void *p)
@@ -69,7 +68,7 @@ private:
     time_t created;
     boost::optional<ComboAddress> anyLocal;
     DNSName qname;
-    DNSPacket* complete;
+    std::unique_ptr<DNSPacket> complete;
     DNSName aname;
     uint8_t anameScopeMask;
     ComboAddress remote;
@@ -91,5 +90,3 @@ private:
   int getID_locked();
   uint16_t d_xor;
 };
-
-#endif

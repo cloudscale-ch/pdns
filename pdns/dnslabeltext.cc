@@ -256,7 +256,7 @@ _again:
 };
 
 
-DNSName::string_t segmentDNSNameRaw(const char* realinput)
+DNSName::string_t segmentDNSNameRaw(const char* realinput, size_t inputlen)
 {
 
 #line 263 "dnslabeltext.cc"
@@ -322,7 +322,6 @@ static const int dnsnameraw_en_main = 1;
           return ret;
         }
 
-        unsigned int inputlen=strlen(realinput);
         ret.reserve(inputlen+1);
 
         const char *p = realinput, *pe = realinput + inputlen;
@@ -332,12 +331,12 @@ static const int dnsnameraw_en_main = 1;
         char labellen=0;
         unsigned int lenpos=0;
         
-#line 336 "dnslabeltext.cc"
+#line 335 "dnslabeltext.cc"
 	{
 	cs = dnsnameraw_start;
 	}
 
-#line 341 "dnslabeltext.cc"
+#line 340 "dnslabeltext.cc"
 	{
 	int _klen;
 	unsigned int _trans;
@@ -411,7 +410,7 @@ _match:
 		switch ( *_acts++ )
 		{
 	case 0:
-#line 113 "dnslabeltext.rl"
+#line 112 "dnslabeltext.rl"
 	{ 
                         if (labellen < 0 || labellen > 63) {
                           throw runtime_error("Unable to parse DNS name '"+string(realinput)+"': invalid label length "+std::to_string(labellen));
@@ -421,7 +420,7 @@ _match:
                 }
 	break;
 	case 1:
-#line 120 "dnslabeltext.rl"
+#line 119 "dnslabeltext.rl"
 	{ 
                         lenpos=ret.size();
                         ret.append(1, (char)0);
@@ -429,7 +428,7 @@ _match:
                 }
 	break;
 	case 2:
-#line 126 "dnslabeltext.rl"
+#line 125 "dnslabeltext.rl"
 	{
                   char c = *p;
                   ret.append(1, c);
@@ -437,7 +436,7 @@ _match:
                 }
 	break;
 	case 3:
-#line 131 "dnslabeltext.rl"
+#line 130 "dnslabeltext.rl"
 	{
                   char c = *p;
                   val *= 10;
@@ -445,7 +444,7 @@ _match:
                 }
 	break;
 	case 4:
-#line 136 "dnslabeltext.rl"
+#line 135 "dnslabeltext.rl"
 	{
                   ret.append(1, val);
                   labellen++;
@@ -453,13 +452,13 @@ _match:
                 }
 	break;
 	case 5:
-#line 142 "dnslabeltext.rl"
+#line 141 "dnslabeltext.rl"
 	{
                   ret.append(1, *(p));
                   labellen++;
                 }
 	break;
-#line 463 "dnslabeltext.cc"
+#line 462 "dnslabeltext.cc"
 		}
 	}
 
@@ -476,7 +475,7 @@ _again:
 	while ( __nacts-- > 0 ) {
 		switch ( *__acts++ ) {
 	case 0:
-#line 113 "dnslabeltext.rl"
+#line 112 "dnslabeltext.rl"
 	{ 
                         if (labellen < 0 || labellen > 63) {
                           throw runtime_error("Unable to parse DNS name '"+string(realinput)+"': invalid label length "+std::to_string(labellen));
@@ -486,14 +485,14 @@ _again:
                 }
 	break;
 	case 4:
-#line 136 "dnslabeltext.rl"
+#line 135 "dnslabeltext.rl"
 	{
                   ret.append(1, val);
                   labellen++;
                   val=0;
                 }
 	break;
-#line 497 "dnslabeltext.cc"
+#line 496 "dnslabeltext.cc"
 		}
 	}
 	}
@@ -501,7 +500,7 @@ _again:
 	_out: {}
 	}
 
-#line 163 "dnslabeltext.rl"
+#line 162 "dnslabeltext.rl"
 
 
         if ( cs < dnsnameraw_first_final ) {

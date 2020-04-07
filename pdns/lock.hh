@@ -19,9 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef LOCK_HH
-#define LOCK_HH
-
+#pragma once
 #include <pthread.h>
 #include <errno.h>
 #include "misc.hh"
@@ -68,8 +66,7 @@ public:
 
     int err;
     if((err = pthread_rwlock_wrlock(d_lock))) {
-      errno = err;
-      throw PDNSException("error acquiring rwlock wrlock: "+stringerror());
+      throw PDNSException("error acquiring rwlock wrlock: "+stringerror(err));
     }
   }
   ~WriteLock()
@@ -87,7 +84,6 @@ public:
   }
   WriteLock(const WriteLock& rhs) = delete;
   WriteLock& operator=(const WriteLock& rhs) = delete;
-
 
 };
 
@@ -109,8 +105,7 @@ public:
     d_havelock=false;
     int err;
     if((err = pthread_rwlock_trywrlock(d_lock)) && err!=EBUSY) {
-      errno = err;
-      throw PDNSException("error acquiring rwlock tryrwlock: "+stringerror());
+      throw PDNSException("error acquiring rwlock tryrwlock: "+stringerror(err));
     }
     d_havelock=(err==0);
   }
@@ -158,8 +153,7 @@ public:
 
     int err;
     if((err = pthread_rwlock_tryrdlock(d_lock)) && err!=EBUSY) {
-      errno = err;
-      throw PDNSException("error acquiring rwlock tryrdlock: "+stringerror());
+      throw PDNSException("error acquiring rwlock tryrdlock: "+stringerror(err));
     }
     d_havelock=(err==0);
   }
@@ -201,8 +195,7 @@ public:
 
     int err;
     if((err = pthread_rwlock_rdlock(d_lock))) {
-      errno = err;
-      throw PDNSException("error acquiring rwlock readlock: "+stringerror());
+      throw PDNSException("error acquiring rwlock readlock: "+stringerror(err));
     }
   }
   ~ReadLock()
@@ -221,4 +214,3 @@ public:
   ReadLock(const ReadLock& rhs) = delete;
   ReadLock& operator=(const ReadLock& rhs) = delete;
 };
-#endif

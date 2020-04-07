@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "PDNSUTIL" "1" "Nov 29, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "PDNSUTIL" "1" "Apr 06, 2020" "" "PowerDNS Authoritative Server"
 .SH NAME
 pdnsutil \- PowerDNS record and DNSSEC command and control
 .
@@ -71,6 +71,8 @@ algorithms are supported:
 .IP \(bu 2
 rsasha1
 .IP \(bu 2
+rsasha1\-nsec3\-sha1
+.IP \(bu 2
 rsasha256
 .IP \(bu 2
 rsasha512
@@ -88,11 +90,13 @@ ed448
 .B activate\-zone\-key \fIZONE\fP \fIKEY\-ID\fP
 Activate a key with id \fIKEY\-ID\fP within a zone called \fIZONE\fP\&.
 .TP
-add\-zone\-key \fIZONE\fP {\fBKSK\fP,\fBZSK\fP} [\fBactive\fP,\fBinactive\fP] \fIKEYBITS\fP \fIALGORITHM\fP
+add\-zone\-key \fIZONE\fP {\fBKSK\fP,\fBZSK\fP} [\fBactive\fP,\fBinactive\fP] [\fBpublished\fP,\fBunpublished\fP] \fIKEYBITS\fP \fIALGORITHM\fP
 Create a new key for zone \fIZONE\fP, and make it a KSK or a ZSK, with
 the specified algorithm. The key is inactive by default, set it to
-\fBactive\fP to immediately use it to sign \fIZONE\fP\&. Prints the id of
-the added key.
+\fBactive\fP to immediately use it to sign \fIZONE\fP\&. The key is published
+in the zone by default, set it to \fBunpublished\fP to keep it from
+being returned in a DNSKEY query, which is useful for algorithm
+rollovers. Prints the id of the added key.
 .TP
 .B create\-bind\-db \fIFILE\fP
 Create DNSSEC database (sqlite3) at \fIFILE\fP for the BIND backend.
@@ -130,6 +134,9 @@ format used is compatible with BIND and NSD/LDNS. \fBKSK\fP or \fBZSK\fP
 specifies the flags this key should have on import. Prints the id of
 the added key.
 .TP
+.B publish\-zone\-key \fIZONE\fP \fIKEY\-ID\fP
+Publish the key with id \fIKEY\-ID\fP within a zone called \fIZONE\fP\&.
+.TP
 .B remove\-zone\-key \fIZONE\fP \fIKEY\-ID\fP
 Remove a key with id \fIKEY\-ID\fP from a zone called \fIZONE\fP\&.
 .TP
@@ -153,6 +160,9 @@ the 4\-parameter quoted string defaults to \fB\(aq1 0 1 ab\(aq\fP\&. A sample
 commandline is: \fBpdnsutil set\-nsec3 powerdnssec.org \(aq1 1 1 ab\(aq narrow\fP\&.
 \fBWARNING\fP: If running in RSASHA1 mode (algorithm 5 or 7), switching
 from NSEC to NSEC3 will require a DS update in the parent zone.
+.TP
+.B unpublish\-zone\-key \fIZONE\fP \fIKEY\-ID\fP
+Unpublish the key with id \fIKEY\-ID\fP within a zone called \fIZONE\fP\&.
 .TP
 .B unset\-nsec3 \fIZONE\fP
 Converts \fIZONE\fP to NSEC operations. \fBWARNING\fP: If running in
@@ -261,6 +271,9 @@ Get zone metadata. If no \fIATTRIBUTE\fP given, lists all known.
 This convenience command hashes the name \fIRNAME\fP according to the
 NSEC3 settings of \fIZONE\fP\&. Refuses to hash for zones with no NSEC3
 settings.
+.TP
+.B increase\-serial \fIZONE\fP
+Increases the SOA\-serial by 1. Uses SOA\-EDIT.
 .TP
 .B list\-keys [\fIZONE\fP]
 List DNSSEC information for all keys or for \fIZONE\fP\&.

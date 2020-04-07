@@ -19,8 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef REMOTEBACKEND_REMOTEBACKEND_HH
-
+#pragma once
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -155,7 +154,7 @@ class RemoteBackend : public DNSBackend
   RemoteBackend(const std::string &suffix="");
   ~RemoteBackend();
 
-  void lookup(const QType &qtype, const DNSName& qdomain, DNSPacket *pkt_p=0, int zoneId=-1) override;
+  void lookup(const QType &qtype, const DNSName& qdomain, int zoneId=-1, DNSPacket *pkt_p=nullptr) override;
   bool get(DNSResourceRecord &rr) override;
   bool list(const DNSName& target, int domain_id, bool include_disabled=false) override;
 
@@ -169,6 +168,8 @@ class RemoteBackend : public DNSBackend
   bool addDomainKey(const DNSName& name, const KeyData& key, int64_t& id) override;
   bool activateDomainKey(const DNSName& name, unsigned int id) override;
   bool deactivateDomainKey(const DNSName& name, unsigned int id) override;
+  bool publishDomainKey(const DNSName& name, unsigned int id) override;
+  bool unpublishDomainKey(const DNSName& name, unsigned int id) override;
   bool getDomainInfo(const DNSName& domain, DomainInfo& di, bool getSerial=true ) override;
   void setNotified(uint32_t id, uint32_t serial) override;
   bool doesDNSSEC() override;
@@ -189,6 +190,9 @@ class RemoteBackend : public DNSBackend
   bool searchComments(const string &pattern, int maxResults, vector<Comment>& result) override;
   void getAllDomains(vector<DomainInfo> *domains, bool include_disabled=false) override;
   void getUpdatedMasters(vector<DomainInfo>* domains) override;
+  void alsoNotifies(const DNSName &domain, set<string> *ips) override;
+  void getUnfreshSlaveInfos(vector<DomainInfo>* domains) override;
+  void setFresh(uint32_t domain_id) override;
 
   static DNSBackend *maker();
 
@@ -223,4 +227,3 @@ class RemoteBackend : public DNSBackend
 
     void parseDomainInfo(const json11::Json &obj, DomainInfo &di);
 };
-#endif

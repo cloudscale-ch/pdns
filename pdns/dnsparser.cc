@@ -114,7 +114,10 @@ shared_ptr<DNSRecordContent> DNSRecordContent::unserialize(const DNSName& qname,
   drh.d_clen=htons(serialized.size());
 
   memcpy(&packet[pos], &drh, sizeof(drh)); pos+=sizeof(drh);
-  memcpy(&packet[pos], serialized.c_str(), serialized.size()); pos+=(uint16_t)serialized.size();
+  if (serialized.size() > 0) {
+    memcpy(&packet[pos], serialized.c_str(), serialized.size());
+    pos += (uint16_t) serialized.size();
+  }
 
   MOADNSParser mdp(false, (char*)&*packet.begin(), (unsigned int)packet.size());
   shared_ptr<DNSRecordContent> ret= mdp.d_answers.begin()->first.d_content;
@@ -278,8 +281,6 @@ void MOADNSParser::init(bool query, const std::string& packet)
         dr.d_content=DNSRecordContent::mastermake(dr, pr, d_header.opcode);
       }
 
-      d_answers.push_back(make_pair(dr, pr.getPosition() - sizeof(dnsheader)));
-
       /* XXX: XPF records should be allowed after TSIG as soon as the actual XPF option code has been assigned:
          if (dr.d_place == DNSResourceRecord::ADDITIONAL && seenTSIG && dr.d_type != QType::XPF)
       */
@@ -295,6 +296,8 @@ void MOADNSParser::init(bool query, const std::string& packet)
         seenTSIG = true;
         d_tsigPos = recordStartPos;
       }
+
+      d_answers.push_back(make_pair(std::move(dr), pr.getPosition() - sizeof(dnsheader)));
     }
 
 #if 0
@@ -571,122 +574,6 @@ string simpleCompress(const string& elabel, const string& root)
   ret.append(1, (char)0);
   return ret;
 }
-
-
-/** Simple DNSPacketMangler. Ritual is: get a pointer into the packet and moveOffset() to beyond your needs
- *  If you survive that, feel free to read from the pointer */
-class DNSPacketMangler
-{
-public:
-  explicit DNSPacketMangler(std::string& packet)
-    : d_packet((char*) packet.c_str()), d_length(packet.length()), d_notyouroffset(12), d_offset(d_notyouroffset)
-  {}
-  DNSPacketMangler(char* packet, size_t length)
-    : d_packet(packet), d_length(length), d_notyouroffset(12), d_offset(d_notyouroffset)
-  {}
-  
-  /*! Advances past a wire-format domain name
-   * The name is not checked for adherence to length restrictions.
-   * Compression pointers are not followed.
-   */
-  void skipDomainName()
-  {
-    uint8_t len; 
-    while((len=get8BitInt())) { 
-      if(len >= 0xc0) { // extended label
-        get8BitInt();
-        return;
-      }
-      skipBytes(len);
-    }
-  }
-
-  void skipBytes(uint16_t bytes)
-  {
-    moveOffset(bytes);
-  }
-  void rewindBytes(uint16_t by)
-  {
-    rewindOffset(by);
-  }
-  uint32_t get32BitInt()
-  {
-    const char* p = d_packet + d_offset;
-    moveOffset(4);
-    uint32_t ret;
-    memcpy(&ret, (void*)p, sizeof(ret));
-    return ntohl(ret);
-  }
-  uint16_t get16BitInt()
-  {
-    const char* p = d_packet + d_offset;
-    moveOffset(2);
-    uint16_t ret;
-    memcpy(&ret, (void*)p, sizeof(ret));
-    return ntohs(ret);
-  }
-  
-  uint8_t get8BitInt()
-  {
-    const char* p = d_packet + d_offset;
-    moveOffset(1);
-    return *p;
-  }
-  
-  void skipRData()
-  {
-    int toskip = get16BitInt();
-    moveOffset(toskip);
-  }
-
-  void decreaseAndSkip32BitInt(uint32_t decrease)
-  {
-    const char *p = d_packet + d_offset;
-    moveOffset(4);
-
-    uint32_t tmp;
-    memcpy(&tmp, (void*) p, sizeof(tmp));
-    tmp = ntohl(tmp);
-    tmp-=decrease;
-    tmp = htonl(tmp);
-    memcpy(d_packet + d_offset-4, (const char*)&tmp, sizeof(tmp));
-  }
-  void setAndSkip32BitInt(uint32_t value)
-  {
-    moveOffset(4);
-
-    value = htonl(value);
-    memcpy(d_packet + d_offset-4, (const char*)&value, sizeof(value));
-  }
-  uint32_t getOffset() const
-  {
-    return d_offset;
-  }
-private:
-  void moveOffset(uint16_t by)
-  {
-    d_notyouroffset += by;
-    if(d_notyouroffset > d_length)
-      throw std::out_of_range("dns packet out of range: "+std::to_string(d_notyouroffset) +" > " 
-      + std::to_string(d_length) );
-  }
-  void rewindOffset(uint16_t by)
-  {
-    if(d_notyouroffset < by)
-      throw std::out_of_range("Rewinding dns packet out of range: "+std::to_string(d_notyouroffset) +" < "
-                              + std::to_string(by));
-    d_notyouroffset -= by;
-    if(d_notyouroffset < 12)
-      throw std::out_of_range("Rewinding dns packet out of range: "+std::to_string(d_notyouroffset) +" < "
-                              + std::to_string(12));
-  }
-  char* d_packet;
-  size_t d_length;
-  
-  uint32_t d_notyouroffset;  // only 'moveOffset' can touch this
-  const uint32_t&  d_offset; // look.. but don't touch
-  
-};
 
 // method of operation: silently fail if it doesn't work - we're only trying to be nice, don't fall over on it
 void editDNSPacketTTL(char* packet, size_t length, std::function<uint32_t(uint8_t, uint16_t, uint16_t, uint32_t)> visitor)

@@ -19,9 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef PDNS_COMMUNICATOR_HH
-#define PDNS_COMMUNICATOR_HH
-
+#pragma once
 #include <pthread.h>
 #include <string>
 #include <semaphore.h>
@@ -31,7 +29,6 @@
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
-#include <boost/scoped_ptr.hpp>
 using namespace boost::multi_index;
 
 #include <unistd.h>
@@ -76,7 +73,7 @@ public:
     nr.domain   = domain;
     nr.ip       = caIp.toStringWithPort();
     nr.attempts = 0;
-    nr.id       = dns_random(0xffff);
+    nr.id       = dns_random_uint16();
     nr.next     = time(0);
 
     d_nqueue.push_back(nr);
@@ -169,7 +166,7 @@ public:
   bool justNotified(const DNSName &domain, const string &ip);
   void addSuckRequest(const DNSName &domain, const ComboAddress& master);
   void addSlaveCheckRequest(const DomainInfo& di, const ComboAddress& remote);
-  void addTrySuperMasterRequest(DNSPacket *p);
+  void addTrySuperMasterRequest(const DNSPacket& p);
   void notify(const DNSName &domain, const string &ip);
   void mainloop();
   void retrievalLoopThread();
@@ -194,7 +191,7 @@ private:
   map<pair<DNSName,string>,time_t>d_holes;
   pthread_mutex_t d_holelock;
   void suck(const DNSName &domain, const ComboAddress& remote);
-  void ixfrSuck(const DNSName &domain, const TSIGTriplet& tt, const ComboAddress& laddr, const ComboAddress& remote, boost::scoped_ptr<AuthLua4>& pdl,
+  void ixfrSuck(const DNSName &domain, const TSIGTriplet& tt, const ComboAddress& laddr, const ComboAddress& remote, std::unique_ptr<AuthLua4>& pdl,
                 ZoneStatus& zs, vector<DNSRecord>* axfr);
 
   void slaveRefresh(PacketHandler *P);
@@ -258,7 +255,7 @@ public:
     this->resolve_name(&addresses, name);
     
     if(b) {
-        b->lookup(QType(QType::ANY),name);
+        b->lookup(QType(QType::ANY),name,-1);
         DNSZoneRecord rr;
         while(b->get(rr))
           if(rr.dr.d_type == QType::A || rr.dr.d_type==QType::AAAA)
@@ -291,6 +288,3 @@ private:
     }
   }
 };
-
-
-#endif

@@ -41,7 +41,7 @@ int SSocket(int family, int type, int flags)
 {
   int ret = socket(family, type, flags);
   if(ret < 0)
-    RuntimeError(boost::format("creating socket of type %d: %s") % family % strerror(errno));
+    RuntimeError(boost::format("creating socket of type %d: %s") % family % stringerror());
   return ret;
 }
 
@@ -116,7 +116,7 @@ int SAccept(int sockfd, ComboAddress& remote)
 
   int ret = accept(sockfd, (struct sockaddr*)&remote, &remlen);
   if(ret < 0)
-    RuntimeError(boost::format("accepting new connection on socket: %s") % strerror(errno));
+    RuntimeError(boost::format("accepting new connection on socket: %s") % stringerror());
   return ret;
 }
 
@@ -124,7 +124,7 @@ int SListen(int sockfd, int limit)
 {
   int ret = listen(sockfd, limit);
   if(ret < 0)
-    RuntimeError(boost::format("setting socket to listen: %s") % strerror(errno));
+    RuntimeError(boost::format("setting socket to listen: %s") % stringerror());
   return ret;
 }
 
@@ -132,7 +132,7 @@ int SSetsockopt(int sockfd, int level, int opname, int value)
 {
   int ret = setsockopt(sockfd, level, opname, &value, sizeof(value));
   if(ret < 0)
-    RuntimeError(boost::format("setsockopt for level %d and opname %d to %d failed: %s") % level % opname % value % strerror(errno));
+    RuntimeError(boost::format("setsockopt for level %d and opname %d to %d failed: %s") % level % opname % value % stringerror());
   return ret;
 }
 
@@ -221,7 +221,7 @@ ssize_t sendfromto(int sock, const char* data, size_t len, int flags, const Comb
 {
   struct msghdr msgh;
   struct iovec iov;
-  char cbuf[256];
+  cmsgbuf_aligned cbuf;
 
   /* Set up iov and msgh structures. */
   memset(&msgh, 0, sizeof(struct msghdr));
@@ -233,7 +233,7 @@ ssize_t sendfromto(int sock, const char* data, size_t len, int flags, const Comb
   msgh.msg_namelen = to.getSocklen();
 
   if(from.sin4.sin_family) {
-    addCMsgSrcAddr(&msgh, cbuf, &from, 0);
+    addCMsgSrcAddr(&msgh, &cbuf, &from, 0);
   }
   else {
     msgh.msg_control=NULL;
@@ -244,7 +244,7 @@ ssize_t sendfromto(int sock, const char* data, size_t len, int flags, const Comb
 // be careful: when using this for receive purposes, make sure addr->sin4.sin_family is set appropriately so getSocklen works!
 // be careful: when using this function for *send* purposes, be sure to set cbufsize to 0!
 // be careful: if you don't call addCMsgSrcAddr after fillMSGHdr, make sure to set msg_control to NULL
-void fillMSGHdr(struct msghdr* msgh, struct iovec* iov, char* cbuf, size_t cbufsize, char* data, size_t datalen, ComboAddress* addr)
+void fillMSGHdr(struct msghdr* msgh, struct iovec* iov, cmsgbuf_aligned* cbuf, size_t cbufsize, char* data, size_t datalen, ComboAddress* addr)
 {
   iov->iov_base = data;
   iov->iov_len  = datalen;
@@ -294,7 +294,7 @@ size_t sendMsgWithOptions(int fd, const char* buffer, size_t len, const ComboAdd
 {
   struct msghdr msgh;
   struct iovec iov;
-  char cbuf[256];
+  cmsgbuf_aligned cbuf;
 
   /* Set up iov and msgh structures. */
   memset(&msgh, 0, sizeof(struct msghdr));
@@ -312,7 +312,7 @@ size_t sendMsgWithOptions(int fd, const char* buffer, size_t len, const ComboAdd
   msgh.msg_flags = 0;
 
   if (localItf != 0 && local) {
-    addCMsgSrcAddr(&msgh, cbuf, local, localItf);
+    addCMsgSrcAddr(&msgh, &cbuf, local, localItf);
   }
 
   iov.iov_base = reinterpret_cast<void*>(const_cast<char*>(buffer));
@@ -352,10 +352,11 @@ size_t sendMsgWithOptions(int fd, const char* buffer, size_t len, const ComboAdd
       return res;
     }
     else if (res == -1) {
-      if (errno == EINTR) {
+      int err = errno;
+      if (err == EINTR) {
         continue;
       }
-      else if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS || errno == ENOTCONN) {
+      else if (err == EAGAIN || err == EWOULDBLOCK || err == EINPROGRESS || err == ENOTCONN) {
         /* EINPROGRESS might happen with non blocking socket,
            especially with TCP Fast Open */
         return sent;

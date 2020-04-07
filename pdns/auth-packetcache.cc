@@ -30,13 +30,8 @@ extern StatBag S;
 
 const unsigned int AuthPacketCache::s_mincleaninterval, AuthPacketCache::s_maxcleaninterval;
 
-AuthPacketCache::AuthPacketCache(size_t mapsCount): d_lastclean(time(nullptr))
+AuthPacketCache::AuthPacketCache(size_t mapsCount): d_maps(mapsCount), d_lastclean(time(nullptr))
 {
-  d_maps.resize(mapsCount);
-  for(auto& mc : d_maps) {
-    pthread_rwlock_init(&mc.d_mut, 0);
-  }
-
   S.declare("packetcache-hit", "Number of hits on the packet cache");
   S.declare("packetcache-miss", "Number of misses on the packet cache");
   S.declare("packetcache-size", "Number of entries in the packet cache");
@@ -63,7 +58,15 @@ AuthPacketCache::~AuthPacketCache()
   }
 }
 
-bool AuthPacketCache::get(DNSPacket *p, DNSPacket *cached)
+void AuthPacketCache::MapCombo::reserve(size_t numberOfEntries)
+{
+#if BOOST_VERSION >= 105600
+  WriteLock wl(&d_mut);
+  d_map.get<HashTag>().reserve(numberOfEntries);
+#endif /* BOOST_VERSION >= 105600 */
+}
+
+bool AuthPacketCache::get(DNSPacket& p, DNSPacket& cached)
 {
   if(!d_ttl) {
     return false;
@@ -71,13 +74,13 @@ bool AuthPacketCache::get(DNSPacket *p, DNSPacket *cached)
 
   cleanupIfNeeded();
 
-  uint32_t hash = canHashPacket(p->getString());
-  p->setHash(hash);
+  uint32_t hash = canHashPacket(p.getString());
+  p.setHash(hash);
 
   string value;
   bool haveSomething;
   time_t now = time(nullptr);
-  auto& mc = getMap(p->qdomain);
+  auto& mc = getMap(p.qdomain);
   {
     TryReadLock rl(&mc.d_mut);
     if(!rl.gotIt()) {
@@ -85,7 +88,7 @@ bool AuthPacketCache::get(DNSPacket *p, DNSPacket *cached)
       return false;
     }
 
-    haveSomething = getEntryLocked(mc.d_map, p->getString(), hash, p->qdomain, p->qtype.getCode(), p->d_tcp, now, value);
+    haveSomething = getEntryLocked(mc.d_map, p.getString(), hash, p.qdomain, p.qtype.getCode(), p.d_tcp, now, value);
   }
 
   if (!haveSomething) {
@@ -93,14 +96,14 @@ bool AuthPacketCache::get(DNSPacket *p, DNSPacket *cached)
     return false;
   }
 
-  if(cached->noparse(value.c_str(), value.size()) < 0) {
+  if(cached.noparse(value.c_str(), value.size()) < 0) {
     return false;
   }
 
   (*d_statnumhit)++;
-  cached->spoofQuestion(p); // for correct case
-  cached->qdomain = p->qdomain;
-  cached->qtype = p->qtype;
+  cached.spoofQuestion(p); // for correct case
+  cached.qdomain = p.qdomain;
+  cached.qtype = p.qtype;
 
   return true;
 }
@@ -110,7 +113,7 @@ bool AuthPacketCache::entryMatches(cmap_t::index<HashTag>::type::iterator& iter,
   return iter->tcp == tcp && iter->qtype == qtype && iter->qname == qname && queryMatches(iter->query, query, qname);
 }
 
-void AuthPacketCache::insert(DNSPacket *q, DNSPacket *r, unsigned int maxTTL)
+void AuthPacketCache::insert(DNSPacket& q, DNSPacket& r, unsigned int maxTTL)
 {
   if(!d_ttl) {
     return;
@@ -118,11 +121,11 @@ void AuthPacketCache::insert(DNSPacket *q, DNSPacket *r, unsigned int maxTTL)
 
   cleanupIfNeeded();
 
-  if (ntohs(q->d.qdcount) != 1) {
+  if (ntohs(q.d.qdcount) != 1) {
     return; // do not try to cache packets with multiple questions
   }
 
-  if (q->qclass != QClass::IN) // we only cache the INternet
+  if (q.qclass != QClass::IN) // we only cache the INternet
     return;
 
   uint32_t ourttl = std::min(d_ttl, maxTTL);
@@ -130,17 +133,17 @@ void AuthPacketCache::insert(DNSPacket *q, DNSPacket *r, unsigned int maxTTL)
     return;
   }  
 
-  uint32_t hash = q->getHash();
+  uint32_t hash = q.getHash();
   time_t now = time(nullptr);
   CacheEntry entry;
   entry.hash = hash;
   entry.created = now;
   entry.ttd = now + ourttl;
-  entry.qname = q->qdomain;
-  entry.qtype = q->qtype.getCode();
-  entry.value = r->getString();
-  entry.tcp = r->d_tcp;
-  entry.query = q->getString();
+  entry.qname = q.qdomain;
+  entry.qtype = q.qtype.getCode();
+  entry.value = r.getString();
+  entry.tcp = r.d_tcp;
+  entry.query = q.getString();
   
   auto& mc = getMap(entry.qname);
   {
@@ -159,6 +162,7 @@ void AuthPacketCache::insert(DNSPacket *q, DNSPacket *r, unsigned int maxTTL)
         continue;
       }
 
+      moveCacheItemToBack<SequencedTag>(mc.d_map, iter);
       iter->value = entry.value;
       iter->ttd = now + ourttl;
       iter->created = now;
@@ -166,8 +170,16 @@ void AuthPacketCache::insert(DNSPacket *q, DNSPacket *r, unsigned int maxTTL)
     }
 
     /* no existing entry found to refresh */
-    mc.d_map.insert(entry);
-    (*d_statnumentries)++;
+    mc.d_map.insert(std::move(entry));
+
+    if (*d_statnumentries >= d_maxEntries) {
+      /* remove the least recently inserted or replaced entry */
+      auto& sidx = mc.d_map.get<SequencedTag>();
+      sidx.pop_front();
+    }
+    else {
+      ++(*d_statnumentries);
+    }
   }
 }
 
@@ -207,7 +219,7 @@ uint64_t AuthPacketCache::purge()
 uint64_t AuthPacketCache::purgeExact(const DNSName& qname)
 {
   auto& mc = getMap(qname);
-  uint64_t delcount = purgeExactLockedCollection(mc, qname);
+  uint64_t delcount = purgeExactLockedCollection<NameTag>(mc, qname);
 
   *d_statnumentries -= delcount;
 
@@ -224,7 +236,7 @@ uint64_t AuthPacketCache::purge(const string &match)
   uint64_t delcount = 0;
 
   if(ends_with(match, "$")) {
-    delcount = purgeLockedCollectionsVector(d_maps, match);
+    delcount = purgeLockedCollectionsVector<NameTag>(d_maps, match);
     *d_statnumentries -= delcount;
   }
   else {
@@ -236,11 +248,7 @@ uint64_t AuthPacketCache::purge(const string &match)
 			   
 void AuthPacketCache::cleanup()
 {
-  uint64_t maxCached = d_maxEntries;
-  uint64_t cacheSize = *d_statnumentries;
-  uint64_t totErased = 0;
-
-  totErased = pruneLockedCollectionsVector(d_maps, maxCached, cacheSize);
+  uint64_t totErased = pruneLockedCollectionsVector<SequencedTag>(d_maps);
   *d_statnumentries -= totErased;
 
   DLOG(g_log<<"Done with cache clean, cacheSize: "<<(*d_statnumentries)<<", totErased"<<totErased<<endl);

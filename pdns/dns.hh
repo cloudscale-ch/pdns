@@ -37,7 +37,7 @@ struct DNSRecord;
 
 struct SOAData
 {
-  SOAData() : ttl(0), serial(0), refresh(0), retry(0), expire(0), default_ttl(0), db(0), domain_id(-1) {};
+  SOAData() : ttl(0), serial(0), refresh(0), retry(0), expire(0), minimum(0), db(0), domain_id(-1) {};
 
   DNSName qname;
   DNSName nameserver;
@@ -47,9 +47,11 @@ struct SOAData
   uint32_t refresh;
   uint32_t retry;
   uint32_t expire;
-  uint32_t default_ttl;
+  uint32_t minimum;
   DNSBackend *db;
   int domain_id;
+
+  uint32_t getNegativeTTL() const { return min(ttl, minimum); }
 };
 
 class RCode
@@ -71,6 +73,7 @@ class Opcode
 {
 public:
   enum { Query=0, IQuery=1, Status=2, Notify=4, Update=5 };
+  static std::string to_s(uint8_t opcode);
 };
 
 // enum for policy decisions, used by both auth and recursor. Not all values supported everywhere.
@@ -81,7 +84,6 @@ class DNSResourceRecord
 {
 public:
   DNSResourceRecord() : last_modified(0), ttl(0), signttl(0), domain_id(-1), qclass(1), scopeMask(0), auth(1), disabled(0) {};
-  ~DNSResourceRecord(){};
   static DNSResourceRecord fromWire(const DNSRecord& d);
 
   enum Place : uint8_t {QUESTION=0, ANSWER=1, AUTHORITY=2, ADDITIONAL=3}; //!< Type describing the positioning within, say, a DNSPacket

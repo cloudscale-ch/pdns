@@ -190,6 +190,25 @@ bool UeberBackend::deactivateDomainKey(const DNSName& name, unsigned int id)
   return false;
 }
 
+bool UeberBackend::publishDomainKey(const DNSName& name, unsigned int id)
+{
+  for(DNSBackend* db :  backends) {
+    if(db->publishDomainKey(name, id))
+      return true;
+  }
+  return false;
+}
+
+bool UeberBackend::unpublishDomainKey(const DNSName& name, unsigned int id)
+{
+  for(DNSBackend* db :  backends) {
+    if(db->unpublishDomainKey(name, id))
+      return true;
+  }
+  return false;
+}
+
+
 bool UeberBackend::removeDomainKey(const DNSName& name, unsigned int id)
 {
   for(DNSBackend* db :  backends) {
@@ -509,7 +528,7 @@ void UeberBackend::addNegCache(const Question &q)
   QC.insert(q.qname, q.qtype, vector<DNSZoneRecord>(), d_negcache_ttl, q.zoneId);
 }
 
-void UeberBackend::addCache(const Question &q, const vector<DNSZoneRecord> &rrs)
+void UeberBackend::addCache(const Question &q, vector<DNSZoneRecord> &&rrs)
 {
   extern AuthQueryCache QC;
 
@@ -524,7 +543,7 @@ void UeberBackend::addCache(const Question &q, const vector<DNSZoneRecord> &rrs)
      return;
   }
 
-  QC.insert(q.qname, q.qtype, rrs, store_ttl, q.zoneId);
+  QC.insert(q.qname, q.qtype, std::move(rrs), store_ttl, q.zoneId);
 }
 
 void UeberBackend::alsoNotifies(const DNSName &domain, set<string> *ips)
@@ -540,7 +559,7 @@ UeberBackend::~UeberBackend()
 }
 
 // this handle is more magic than most
-void UeberBackend::lookup(const QType &qtype,const DNSName &qname, DNSPacket *pkt_p, int zoneId)
+void UeberBackend::lookup(const QType &qtype,const DNSName &qname, int zoneId, DNSPacket *pkt_p)
 {
   if(d_stale) {
     g_log<<Logger::Error<<"Stale ueberbackend received question, signalling that we want to be recycled"<<endl;
@@ -580,7 +599,7 @@ void UeberBackend::lookup(const QType &qtype,const DNSName &qname, DNSPacket *pk
       //      cout<<"UeberBackend::lookup("<<qname<<"|"<<DNSRecordContent::NumberToType(qtype.getCode())<<"): uncached"<<endl;
       d_negcached=d_cached=false;
       d_answers.clear(); 
-      (d_handle.d_hinterBackend=backends[d_handle.i++])->lookup(qtype, qname,pkt_p,zoneId);
+      (d_handle.d_hinterBackend=backends[d_handle.i++])->lookup(qtype, qname,zoneId,pkt_p);
     } 
     else if(cstat==0) {
       //      cout<<"UeberBackend::lookup("<<qname<<"|"<<DNSRecordContent::NumberToType(qtype.getCode())<<"): NEGcached"<<endl;
@@ -628,11 +647,14 @@ bool UeberBackend::get(DNSZoneRecord &rr)
     }
     else {
       // cout<<"adding query cache"<<endl;
-      addCache(d_question, d_answers);
+      addCache(d_question, std::move(d_answers));
     }
     d_answers.clear();
     return false;
   }
+
+  rr.dr.d_place=DNSResourceRecord::ANSWER;
+
   d_ancount++;
   d_answers.push_back(rr);
   return true;
@@ -681,7 +703,7 @@ bool UeberBackend::handle::get(DNSZoneRecord &r)
            <<" out of answers, taking next"<<endl);
       
       d_hinterBackend=parent->backends[i++];
-      d_hinterBackend->lookup(qtype,qname,pkt_p,parent->d_domain_id);
+      d_hinterBackend->lookup(qtype,qname,parent->d_domain_id,pkt_p);
     }
     else 
       break;

@@ -62,6 +62,17 @@ void DNSProtoBufMessage::setResponseCode(uint8_t rcode)
 #endif /* HAVE_PROTOBUF */
 }
 
+void DNSProtoBufMessage::setNetworkErrorResponseCode()
+{
+#ifdef HAVE_PROTOBUF
+  PBDNSMessage_DNSResponse* response = d_message.mutable_response();
+  if (response) {
+    /* special code meaning 'network error', like a timeout */
+    response->set_rcode(65536);
+  }
+#endif /* HAVE_PROTOBUF */
+}
+
 void DNSProtoBufMessage::setTime(time_t sec, uint32_t usec)
 {
 #ifdef HAVE_PROTOBUF
@@ -228,6 +239,13 @@ void DNSProtoBufMessage::setRequestor(const ComboAddress& requestor)
 #endif /* HAVE_PROTOBUF */
 }
 
+void DNSProtoBufMessage::setRequestorPort(uint16_t port)
+{
+#ifdef HAVE_PROTOBUF
+  d_message.set_fromport(port);
+#endif /* HAVE_PROTOBUF */
+}
+
 void DNSProtoBufMessage::setRequestorId(const std::string& requestorId)
 {
 #ifdef HAVE_PROTOBUF
@@ -239,6 +257,13 @@ void DNSProtoBufMessage::setDeviceId(const std::string& deviceId)
 {
 #ifdef HAVE_PROTOBUF
   d_message.set_deviceid(deviceId);
+#endif /* HAVE_PROTOBUF */
+}
+
+void DNSProtoBufMessage::setDeviceName(const std::string& deviceName)
+{
+#ifdef HAVE_PROTOBUF
+  d_message.set_devicename(deviceName);
 #endif /* HAVE_PROTOBUF */
 }
 
@@ -265,6 +290,13 @@ void DNSProtoBufMessage::setResponder(const ComboAddress& responder)
   else if (responder.sin4.sin_family == AF_INET6) {
     d_message.set_to(&responder.sin6.sin6_addr.s6_addr, sizeof(responder.sin6.sin6_addr.s6_addr));
   }
+#endif /* HAVE_PROTOBUF */
+}
+
+void DNSProtoBufMessage::setResponderPort(uint16_t port)
+{
+#ifdef HAVE_PROTOBUF
+  d_message.set_toport(port);
 #endif /* HAVE_PROTOBUF */
 }
 
@@ -300,12 +332,16 @@ void DNSProtoBufMessage::setInitialRequestID(const boost::uuids::uuid& uuid)
   std::copy(uuid.begin(), uuid.end(), messageId->begin());
 }
 
-void DNSProtoBufMessage::update(const boost::uuids::uuid& uuid, const ComboAddress* requestor, const ComboAddress* responder, bool isTCP, uint16_t id)
+void DNSProtoBufMessage::updateTime()
 {
   struct timespec ts;
   gettime(&ts, true);
   setTime(ts.tv_sec, ts.tv_nsec / 1000);
+}
 
+void DNSProtoBufMessage::update(const boost::uuids::uuid& uuid, const ComboAddress* requestor, const ComboAddress* responder, bool isTCP, uint16_t id)
+{
+  updateTime();
   setUUID(uuid);
   d_message.set_id(ntohs(id));
 
@@ -320,9 +356,11 @@ void DNSProtoBufMessage::update(const boost::uuids::uuid& uuid, const ComboAddre
 
   if (responder) {
     setResponder(*responder);
+    setResponderPort(responder->getPort());
   }
   if (requestor) {
     setRequestor(*requestor);
+    setRequestorPort(requestor->getPort());
   }
 }
 

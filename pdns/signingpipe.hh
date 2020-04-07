@@ -19,8 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef PDNS_SIGNINGPIPE
-#define PDNS_SIGNINGPIPE
+#pragma once
 #include <stdio.h>
 #include <thread>
 #include <vector>
@@ -57,7 +56,7 @@ private:
   void flushToSign();	
   void dedupRRSet();
   void sendRRSetToWorker(); // dispatch RRSET to worker
-  void addSignedToChunks(chunk_t* signedChunk);
+  void addSignedToChunks(std::unique_ptr<chunk_t>& signedChunk);
   pair<vector<int>, vector<int> > waitForRW(bool rd, bool wr, int seconds);
 
   static void* helperWorker(ChunkedSigningPipe* csp, int fd);
@@ -66,7 +65,7 @@ private:
   unsigned int d_numworkers;
   unsigned int d_submitted;
 
-  rrset_t* d_rrsetToSign;
+  std::unique_ptr<rrset_t> d_rrsetToSign;
   std::deque< std::vector<DNSZoneRecord> > d_chunks;
   DNSName d_signer;
   
@@ -80,5 +79,3 @@ private:
   bool d_mustSign;
   bool d_final;
 };
-
-#endif

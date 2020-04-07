@@ -13,6 +13,7 @@ static char sqlCreate[] __attribute__((unused))=
 " domain     VARCHAR(255) COLLATE NOCASE,"
 " flags      INT NOT NULL,"
 " active     BOOL,"
+" published  BOOL DEFAULT 1,"
 " content    TEXT"
 ");"
 ""

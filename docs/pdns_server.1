@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "PDNS_SERVER" "1" "Nov 29, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "PDNS_SERVER" "1" "Apr 06, 2020" "" "PowerDNS Authoritative Server"
 .SH NAME
 pdns_server \- The PowerDNS Authoritative Namserver
 .
@@ -59,6 +59,12 @@ logging and exposes the raw control socket.
 .TP
 .BI \-\-loglevel\fB= <LEVEL>
 Set the logging level.
+.TP
+.B \-\-config
+Show the currently configuration. There are three optional values:
+\-\-config=default show the default configuration.
+\-\-config=diff    show modified options in the curent configuration.
+\-\-config=check   parse the current configuration, with error checking.
 .TP
 .B \-\-help
 To view more options that are available use this program.

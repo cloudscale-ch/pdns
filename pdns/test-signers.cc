@@ -7,7 +7,6 @@
 #include <boost/assign/list_of.hpp>
 
 #include <boost/tuple/tuple.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "base64.hh"
 #include "dnsseckeeper.hh"
@@ -28,7 +27,7 @@ static const struct signerParams
   std::string name;
   std::string rfcMsgDump;
   std::string rfcB64Signature;
-  unsigned int bits;
+  int bits;
   uint16_t flags;
   uint16_t rfcFlags;
   uint8_t algorithm;
@@ -112,7 +111,7 @@ static void checkRR(const signerParams& signer)
   dpk.setKey(dcke);
   dpk.d_flags = signer.rfcFlags;
 
-  vector<std::shared_ptr<DNSRecordContent> > rrs;
+  sortedRecords_t rrs;
   /* values taken from rfc8080 for ed25519 and ed448, rfc5933 for gost */
   DNSName qname(dpk.d_algorithm == 12 ? "www.example.net." : "example.com.");
 
@@ -126,17 +125,17 @@ static void checkRR(const signerParams& signer)
     rrc.d_signer = DNSName("example.net.");
     inception = 946684800;
     expire = 1893456000;
-    rrs.push_back(DNSRecordContent::mastermake(QType::A, QClass::IN, "192.0.2.1"));
+    rrs.insert(DNSRecordContent::mastermake(QType::A, QClass::IN, "192.0.2.1"));
   }
   else {
     rrc.d_signer = qname;
-    rrs.push_back(DNSRecordContent::mastermake(QType::MX, QClass::IN, "10 mail.example.com."));
+    rrs.insert(DNSRecordContent::mastermake(QType::MX, QClass::IN, "10 mail.example.com."));
   }
 
   rrc.d_originalttl = 3600;
   rrc.d_sigexpire = expire;
   rrc.d_siginception = inception;
-  rrc.d_type = rrs.at(0)->getType();
+  rrc.d_type = (*rrs.cbegin())->getType();
   rrc.d_labels = qname.countLabels();
   rrc.d_tag = dpk.getTag();
   rrc.d_algorithm = dpk.d_algorithm;
@@ -182,17 +181,17 @@ BOOST_AUTO_TEST_CASE(test_generic_signers)
     BOOST_CHECK_EQUAL(drc.getZoneRepresentation(), signer.zoneRepresentation);
 
     DNSName name(signer.name);
-    auto ds1 = makeDSFromDNSKey(name, drc, DNSSECKeeper::SHA1);
+    auto ds1 = makeDSFromDNSKey(name, drc, DNSSECKeeper::DIGEST_SHA1);
     if (!signer.dsSHA1.empty()) {
       BOOST_CHECK_EQUAL(ds1.getZoneRepresentation(), signer.dsSHA1);
     }
 
-    auto ds2 = makeDSFromDNSKey(name, drc, DNSSECKeeper::SHA256);
+    auto ds2 = makeDSFromDNSKey(name, drc, DNSSECKeeper::DIGEST_SHA256);
     if (!signer.dsSHA256.empty()) {
       BOOST_CHECK_EQUAL(ds2.getZoneRepresentation(), signer.dsSHA256);
     }
 
-    auto ds4 = makeDSFromDNSKey(name, drc, DNSSECKeeper::SHA384);
+    auto ds4 = makeDSFromDNSKey(name, drc, DNSSECKeeper::DIGEST_SHA384);
     if (!signer.dsSHA384.empty()) {
       BOOST_CHECK_EQUAL(ds4.getZoneRepresentation(), signer.dsSHA384);
     }
@@ -216,7 +215,7 @@ BOOST_AUTO_TEST_CASE(test_generic_signers)
 
 #if defined(HAVE_LIBDECAF) || defined(HAVE_LIBCRYPTO_ED448)
 BOOST_AUTO_TEST_CASE(test_ed448_signer) {
-    vector<std::shared_ptr<DNSRecordContent> > rrs;
+    sortedRecords_t rrs;
     DNSName qname("example.com.");
     DNSKEYRecordContent drc;
 
@@ -231,7 +230,7 @@ BOOST_AUTO_TEST_CASE(test_ed448_signer) {
 
     reportBasicTypes();
 
-    rrs.push_back(DNSRecordContent::mastermake(QType::MX, 1, "10 mail.example.com."));
+    rrs.insert(DNSRecordContent::mastermake(QType::MX, 1, "10 mail.example.com."));
 
     RRSIGRecordContent rrc;
     rrc.d_originalttl = 3600;
