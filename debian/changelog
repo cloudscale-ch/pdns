@@ -1,3 +1,20 @@
+pdns (4.3.0-1) unstable; urgency=medium
+
+  * New upstream version 4.3.0
+  * Follow upstream init support changes.
+    Upstream has moved around socket dir and there are known issues with the
+    init scripts. Operators will be better off just using the systemd units
+    instead.
+    pdns-server now starts as the pdns user, so powerdns.conf needs to be
+    readable by this user; postinst fixes this.
+  * Remove packages for upstream removed backends: lua, mydns
+  * Enable core features: Lua records, protobuf
+  * pdns-backend-bind: install schema files
+  * Bump Standards-Version to 4.5.0
+  * Use debhelper v13
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Tue, 07 Apr 2020 15:26:55 +0000
+
 pdns (4.2.1-1) unstable; urgency=medium
 
   * New upstream version 4.2.1
