@@ -33,6 +33,7 @@ override_dh_auto_configure:
 		--enable-tools \
 		--without-protobuf \
 		--enable-unit-tests \
+		--enable-lua-records \
 		--enable-reproducible \
 		--disable-silent-rules \
 		$(CONFIGURE_ARGS)
