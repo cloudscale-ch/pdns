@@ -6,11 +6,6 @@ if [ -n "$PDNSDEBUG" ]; then
   set -x
 fi
 
-# Startup errors should never cause dpkg to fail.
-initscript_error() {
-    return 0
-}
-
 case "$1" in
   configure)
     if [ -z "`getent group pdns`" ]; then
@@ -21,6 +16,8 @@ case "$1" in
       adduser --quiet --system --home /var/spool/powerdns --shell /bin/false --ingroup pdns --disabled-password --disabled-login --gecos "PowerDNS" pdns
       echo "done"
     fi
+    chown root:pdns /etc/powerdns/pdns.conf || true
+    chmod 0640 /etc/powerdns/pdns.conf || true
   ;;
 
   triggered)

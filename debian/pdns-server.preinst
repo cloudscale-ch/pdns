@@ -22,6 +22,12 @@ case "$1" in
     backup_conffile "/etc/resolvconf/update.d/pdns"
     delete_unchanged "/etc/insserv.d/pdns-server" af60f140f00b9520efbcd3a18052905d
     backup_conffile "/etc/insserv.d/pdns-server"
+    delete_unchanged "/etc/default/pdns" ddd96d47c8c1d5898f45e81fae15e7ac
+    delete_unchanged "/etc/default/pdns" 99d5d626abd59cc568dadec22403f638
+    backup_conffile "/etc/default/pdns"
+    delete_unchanged "/etc/init.d/pdns" 06f3b374bccaf3b71638e759f8053bda
+    delete_unchanged "/etc/init.d/pdns" 470533b8de800da2f356c04a58f4aa6b
+    backup_conffile "/etc/init.d/pdns"
   ;;
 esac
 

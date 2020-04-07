@@ -1,4 +1,2 @@
 # Often this file will contain passwords.
-pdns-server: non-standard-file-perm etc/powerdns/pdns.conf 0600 != 0644
-# multiple instances are supported by the sysvinit script.
-pdns-server: package-supports-alternative-init-but-no-init.d-script lib/systemd/system/pdns@.service
+pdns-server: non-standard-file-perm etc/powerdns/pdns.conf 0640 != 0644
