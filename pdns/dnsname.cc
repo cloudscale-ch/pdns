@@ -22,6 +22,7 @@
 #include "dnsname.hh"
 #include <boost/format.hpp>
 #include <string>
+#include <cinttypes>
 
 #include "dnswriter.hh"
 #include "misc.hh"
@@ -40,7 +41,7 @@ std::ostream & operator<<(std::ostream &os, const DNSName& d)
   return os <<d.toLogString();
 }
 
-DNSName::DNSName(const char* p)
+DNSName::DNSName(const char* p, size_t length)
 {
   if(p[0]==0 || (p[0]=='.' && p[1]==0)) {
     d_storage.assign(1, (char)0);
@@ -48,7 +49,7 @@ DNSName::DNSName(const char* p)
     if(!strchr(p, '\\')) {
       unsigned char lenpos=0;
       unsigned char labellen=0;
-      size_t plen=strlen(p);
+      size_t plen=length;
       const char* const pbegin=p, *pend=p+plen;
       d_storage.reserve(plen+1);
       for(auto iter = pbegin; iter != pend; ) {
@@ -75,7 +76,7 @@ DNSName::DNSName(const char* p)
       d_storage.append(1, (char)0);
     }
     else {
-      d_storage=segmentDNSNameRaw(p); 
+      d_storage=segmentDNSNameRaw(p, length);
       if(d_storage.size() > 255) {
         throw std::range_error("name too long");
       }
@@ -177,7 +178,8 @@ std::string DNSName::toString(const std::string& separator, const bool trailing)
     const char* end = p + d_storage.size();
 
     while (p < end && *p) {
-      ret += escapeLabel(p + 1, static_cast<size_t>(*p)) + separator;
+      appendEscapedLabel(ret, p + 1, static_cast<size_t>(*p));
+      ret += separator;
       p += *p + 1;
     }
   }
@@ -430,29 +432,49 @@ size_t hash_value(DNSName const& d)
   return d.hash();
 }
 
-string DNSName::escapeLabel(const std::string& label)
+void DNSName::appendEscapedLabel(std::string& appendTo, const char* orig, size_t len)
 {
-  return escapeLabel(label.c_str(), label.size());
-}
-
-string DNSName::escapeLabel(const char* orig, size_t len)
-{
-  std::string ret;
   size_t pos = 0;
 
-  ret.reserve(len);
   while (pos < len) {
     auto p = static_cast<uint8_t>(orig[pos]);
     if(p=='.')
-      ret+="\\.";
+      appendTo+="\\.";
     else if(p=='\\')
-      ret+="\\\\";
+      appendTo+="\\\\";
     else if(p > 0x20 && p < 0x7f)
-      ret.append(1, (char)p);
+      appendTo.append(1, (char)p);
     else {
-      ret+="\\" + (boost::format("%03d") % (unsigned int)p).str();
+      char buf[] = "000";
+      auto got = snprintf(buf, sizeof(buf), "%03" PRIu8, p);
+      if (got < 0 || static_cast<size_t>(got) >= sizeof(buf)) {
+        throw std::runtime_error("Error, snprintf returned " + std::to_string(got) + " while escaping label " + std::string(orig, len));
+      }
+      appendTo.append(1, '\\');
+      appendTo += buf;
     }
     ++pos;
   }
-  return ret;
+}
+
+bool DNSName::has8bitBytes() const
+{
+  const auto& s = d_storage;
+  string::size_type pos = 0;
+  uint8_t length = s.at(pos);
+  while (length > 0) {
+    for (size_t idx = 0; idx < length; idx++) {
+      ++pos;
+      char c = s.at(pos);
+      if(!((c >= 'a' && c <= 'z') ||
+           (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') ||
+           c =='-' || c == '_' || c=='*' || c=='.' || c=='/' || c=='@' || c==' ' || c=='\\' || c==':'))
+        return true;
+    }
+    ++pos;
+    length = s.at(pos);
+  }
+
+  return false;
 }

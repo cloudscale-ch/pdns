@@ -19,9 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef SSTUFF_HH
-#define SSTUFF_HH
-
+#pragma once
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -56,7 +54,7 @@ public:
   Socket(int af, int st, ProtocolType pt=0)
   {
     if((d_socket=socket(af, st, pt))<0)
-      throw NetworkError(strerror(errno));
+      throw NetworkError(stringerror());
     setCloseOnExec(d_socket);
   }
 
@@ -87,7 +85,7 @@ public:
       if(errno==EAGAIN)
         return nullptr;
 
-      throw NetworkError("Accepting a connection: "+string(strerror(errno)));
+      throw NetworkError("Accepting a connection: "+stringerror());
     }
 
     return std::unique_ptr<Socket>(new Socket(s));
@@ -135,10 +133,10 @@ public:
   {
     int tmp=1;
     if(reuseaddr && setsockopt(d_socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&tmp), sizeof tmp)<0)
-      throw NetworkError(string("Setsockopt failed: ")+strerror(errno));
+      throw NetworkError("Setsockopt failed: "+stringerror());
 
     if(::bind(d_socket, reinterpret_cast<const struct sockaddr *>(&local), local.getSocklen())<0)
-      throw NetworkError("While binding: "+string(strerror(errno)));
+      throw NetworkError("While binding: "+stringerror());
   }
 
   //! Connect the socket to a specified endpoint
@@ -158,7 +156,7 @@ public:
     ssize_t bytes;
     d_buffer.resize(s_buflen);
     if((bytes=recvfrom(d_socket, &d_buffer[0], s_buflen, 0, reinterpret_cast<sockaddr *>(&ep) , &remlen)) <0)
-      throw NetworkError("After recvfrom: "+string(strerror(errno)));
+      throw NetworkError("After recvfrom: "+stringerror());
     
     dgram.assign(d_buffer, 0, static_cast<size_t>(bytes));
   }
@@ -171,7 +169,7 @@ public:
     d_buffer.resize(s_buflen);
     if((bytes=recvfrom(d_socket, &d_buffer[0], s_buflen, 0, reinterpret_cast<sockaddr *>(&remote), &remlen))<0) {
       if(errno!=EAGAIN) {
-        throw NetworkError("After async recvfrom: "+string(strerror(errno)));
+        throw NetworkError("After async recvfrom: "+stringerror());
       }
       else {
         return false;
@@ -186,14 +184,14 @@ public:
   void sendTo(const char* msg, size_t len, const ComboAddress &ep)
   {
     if(sendto(d_socket, msg, len, 0, reinterpret_cast<const sockaddr *>(&ep), ep.getSocklen())<0)
-      throw NetworkError("After sendto: "+string(strerror(errno)));
+      throw NetworkError("After sendto: "+stringerror());
   }
 
   //! For connected datagram sockets, send a datagram
   void send(const std::string& msg)
   {
     if(::send(d_socket, msg.c_str(), msg.size(), 0)<0)
-      throw NetworkError("After send: "+string(strerror(errno)));
+      throw NetworkError("After send: "+stringerror());
   }
 
   
@@ -219,7 +217,7 @@ public:
     do {
       res=::send(d_socket, ptr, toWrite, 0);
       if(res<0) 
-        throw NetworkError("Writing to a socket: "+string(strerror(errno)));
+        throw NetworkError("Writing to a socket: "+stringerror());
       if(!res)
         throw NetworkError("EOF on socket");
       toWrite -= static_cast<size_t>(res);
@@ -246,7 +244,7 @@ public:
     if(errno==EAGAIN)
       return 0;
     
-    throw NetworkError("Writing to a socket: "+string(strerror(errno)));
+    throw NetworkError("Writing to a socket: "+stringerror());
   }
 
   //! Writes toWrite bytes from ptr to the socket
@@ -256,7 +254,7 @@ public:
     ssize_t res;
     res=::send(d_socket,ptr,toWrite,0);
     if(res<0) {
-      throw NetworkError("Writing to a socket: "+string(strerror(errno)));
+      throw NetworkError("Writing to a socket: "+stringerror());
     }
     return res;
   }
@@ -317,7 +315,7 @@ public:
     d_buffer.resize(s_buflen);
     ssize_t res=::recv(d_socket, &d_buffer[0], s_buflen, 0);
     if(res<0) 
-      throw NetworkError("Reading from a socket: "+string(strerror(errno)));
+      throw NetworkError("Reading from a socket: "+stringerror());
     data.assign(d_buffer, 0, static_cast<size_t>(res));
   }
 
@@ -326,7 +324,7 @@ public:
   {
     ssize_t res=::recv(d_socket, buffer, bytes, 0);
     if(res<0) 
-      throw NetworkError("Reading from a socket: "+string(strerror(errno)));
+      throw NetworkError("Reading from a socket: "+stringerror());
     return static_cast<size_t>(res);
   }
 
@@ -337,7 +335,7 @@ public:
     if(err == 0)
       throw NetworkError("timeout reading");
     if(err < 0)
-      throw NetworkError("nonblocking read failed: "+string(strerror(errno)));
+      throw NetworkError("nonblocking read failed: "+stringerror());
 
     return read(buffer, n);
   }
@@ -346,7 +344,7 @@ public:
   void listen(unsigned int length=10)
   {
     if(::listen(d_socket,length)<0)
-      throw NetworkError("Setting socket to listen: "+string(strerror(errno)));
+      throw NetworkError("Setting socket to listen: "+stringerror());
   }
 
   //! Returns the internal file descriptor of the socket
@@ -360,6 +358,3 @@ private:
   std::string d_buffer;
   int d_socket;
 };
-
-
-#endif

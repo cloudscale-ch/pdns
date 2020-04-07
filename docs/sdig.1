@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "SDIG" "1" "Nov 29, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "SDIG" "1" "Apr 06, 2020" "" "PowerDNS Authoritative Server"
 .SH NAME
 sdig \- Perform a DNS query and show the results
 .
@@ -35,20 +35,23 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 \fBsdig\fP \fIIP\-ADDRESS\-OR\-DOH\-URL * *PORT\fP \fIQNAME\fP \fIQTYPE\fP [\fIOPTION\fP]
 .SH DESCRIPTION
 .sp
-\fBsdig\fP sends a DNS query to \fIIP\-ADDRESS\-OR\-DOH\-URL\fP on port \fIPORT\fP and displays
-the answer in a formatted way.
+\fBsdig\fP sends a DNS query to \fIIP\-ADDRESS\-OR\-DOH\-URL\fP on port \fIPORT\fP and displays the answer in a formatted way.
 If the address starts with an \fBh\fP, it is assumed to be a DoH endpoint, and \fIPORT\fP is ignored.
+If qname and qtype are both \fI\-\fP and tcp is used, multiple lines are read from stdin, where each line contains a qname and a type.
+If the address is \fBstdin\fP, a DNS packet is read from stdin instead of from the network, and \fIPORT\fP is ignored.
 .SH OPTIONS
 .sp
 These options can be added to the commandline in any order.
 .INDENT 0.0
 .TP
+.B class \fICLASSNUM\fP
+Send the query in the numbered class (like 3 for CHAOS) instead of the default 1 (for IN).
+.TP
 .B dnssec
 Set the DO bit to request DNSSEC information.
 .TP
 .B ednssubnet \fISUBNET\fP
-Send \fISUBNET\fP in the edns\-client\-subnet option. If this option is
-not set, no edns\-client\-subnet option is set in the query.
+Send \fISUBNET\fP in the edns\-client\-subnet option. If this option is not set, no edns\-client\-subnet option is set in the query.
 .TP
 .B hidesoadetails
 Don\(aqt show the SOA serial in the response.

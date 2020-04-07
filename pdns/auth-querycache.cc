@@ -31,13 +31,8 @@ extern StatBag S;
 
 const unsigned int AuthQueryCache::s_mincleaninterval, AuthQueryCache::s_maxcleaninterval;
 
-AuthQueryCache::AuthQueryCache(size_t mapsCount): d_lastclean(time(nullptr))
+AuthQueryCache::AuthQueryCache(size_t mapsCount): d_maps(mapsCount), d_lastclean(time(nullptr))
 {
-  d_maps.resize(mapsCount);
-  for(auto& mc : d_maps) {
-    pthread_rwlock_init(&mc.d_mut, 0);
-  }
-
   S.declare("query-cache-hit","Number of hits on the query cache");
   S.declare("query-cache-miss","Number of misses on the query cache");
   S.declare("query-cache-size", "Number of entries in the query cache");
@@ -64,6 +59,14 @@ AuthQueryCache::~AuthQueryCache()
   }
 }
 
+void AuthQueryCache::MapCombo::reserve(size_t numberOfEntries)
+{
+#if BOOST_VERSION >= 105600
+  WriteLock wl(&d_mut);
+  d_map.get<HashTag>().reserve(numberOfEntries);
+#endif /* BOOST_VERSION >= 105600 */
+}
+
 // called from ueberbackend
 bool AuthQueryCache::getEntry(const DNSName &qname, const QType& qtype, vector<DNSZoneRecord>& value, int zoneID)
 {
@@ -83,7 +86,7 @@ bool AuthQueryCache::getEntry(const DNSName &qname, const QType& qtype, vector<D
   }
 }
 
-void AuthQueryCache::insert(const DNSName &qname, const QType& qtype, const vector<DNSZoneRecord>& value, uint32_t ttl, int zoneID)
+void AuthQueryCache::insert(const DNSName &qname, const QType& qtype, vector<DNSZoneRecord>&& value, uint32_t ttl, int zoneID)
 {
   cleanupIfNeeded();
 
@@ -96,7 +99,7 @@ void AuthQueryCache::insert(const DNSName &qname, const QType& qtype, const vect
   val.ttd = now + ttl;
   val.qname = qname;
   val.qtype = qtype.getCode();
-  val.drs = value;
+  val.drs = std::move(value);
   val.zoneID = zoneID;
 
   auto& mc = getMap(val.qname);
@@ -113,10 +116,18 @@ void AuthQueryCache::insert(const DNSName &qname, const QType& qtype, const vect
     tie(place, inserted) = mc.d_map.insert(val);
 
     if (!inserted) {
-      mc.d_map.replace(place, val);
+      mc.d_map.replace(place, std::move(val));
+      moveCacheItemToBack<SequencedTag>(mc.d_map, place);
     }
     else {
-      (*d_statnumentries)++;
+      if (*d_statnumentries >= d_maxEntries) {
+        /* remove the least recently inserted or replaced entry */
+        auto& sidx = mc.d_map.get<SequencedTag>();
+        sidx.pop_front();
+      }
+      else {
+        (*d_statnumentries)++;
+      }
     }
   }
 }
@@ -173,7 +184,7 @@ uint64_t AuthQueryCache::purge()
 uint64_t AuthQueryCache::purgeExact(const DNSName& qname)
 {
   auto& mc = getMap(qname);
-  uint64_t delcount = purgeExactLockedCollection(mc, qname);
+  uint64_t delcount = purgeExactLockedCollection<NameTag>(mc, qname);
 
   *d_statnumentries -= delcount;
 
@@ -186,7 +197,7 @@ uint64_t AuthQueryCache::purge(const string &match)
   uint64_t delcount = 0;
 
   if(ends_with(match, "$")) {
-    delcount = purgeLockedCollectionsVector(d_maps, match);
+    delcount = purgeLockedCollectionsVector<NameTag>(d_maps, match);
     *d_statnumentries -= delcount;
   }
   else {
@@ -198,13 +209,9 @@ uint64_t AuthQueryCache::purge(const string &match)
 
 void AuthQueryCache::cleanup()
 {
-  uint64_t maxCached = d_maxEntries;
-  uint64_t cacheSize = *d_statnumentries;
-  uint64_t totErased = 0;
-
-  totErased = pruneLockedCollectionsVector(d_maps, maxCached, cacheSize);
-
+  uint64_t totErased = pruneLockedCollectionsVector<SequencedTag>(d_maps);
   *d_statnumentries -= totErased;
+
   DLOG(g_log<<"Done with cache clean, cacheSize: "<<*d_statnumentries<<", totErased"<<totErased<<endl);
 }
 

@@ -19,9 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef COMMON_STARTUP_HH
-#define COMMON_STARTUP_HH
-
+#pragma once
 #include "auth-packetcache.hh"
 #include "auth-querycache.hh"
 #include "utility.hh"
@@ -40,8 +38,8 @@ extern ArgvMap theArg;
 extern StatBag S;  //!< Statistics are gathered across PDNS via the StatBag class S
 extern AuthPacketCache PC; //!< This is the main PacketCache, shared across all threads
 extern AuthQueryCache QC;
-extern DNSProxy *DP;
-extern DynListener *dl;
+extern std::unique_ptr<DNSProxy> DP;
+extern std::unique_ptr<DynListener> dl;
 extern CommunicatorClass Communicator;
 extern std::shared_ptr<UDPNameserver> N;
 extern vector<std::shared_ptr<UDPNameserver> > g_udpReceivers;
@@ -52,12 +50,12 @@ extern void declareArguments();
 extern void declareStats();
 extern void mainthread();
 extern int isGuarded( char ** );
-void* carbonDumpThread(void*);
+void carbonDumpThread();
 extern bool g_anyToTcp;
 extern bool g_8bitDNS;
 #ifdef HAVE_LUA_RECORDS
 extern bool g_doLuaRecord;
 extern bool g_LuaRecordSharedState;
+extern time_t g_luaHealthChecksInterval;
+extern time_t g_luaHealthChecksExpireDelay;
 #endif // HAVE_LUA_RECORDS
-
-#endif // COMMON_STARTUP_HH

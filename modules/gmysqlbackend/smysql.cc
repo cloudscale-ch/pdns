@@ -283,10 +283,10 @@ public:
         g_log<<Logger::Warning<<"Result field at row " << d_residx << " column " << i << " has been truncated, we allocated " << d_res_bind[i].buffer_length << " bytes but at least " << *d_res_bind[i].length << " was needed" << endl;
       }
       if (*d_res_bind[i].is_null) {
-        row.push_back("");
+        row.emplace_back("");
         continue;
       } else {
-        row.push_back(string((char*)d_res_bind[i].buffer, std::min(d_res_bind[i].buffer_length, *d_res_bind[i].length)));
+        row.emplace_back((char*)d_res_bind[i].buffer, std::min(d_res_bind[i].buffer_length, *d_res_bind[i].length));
       }
     }
 
@@ -326,7 +326,7 @@ public:
 
     while(hasNextRow()) {
       nextRow(row);
-      result.push_back(row); 
+      result.push_back(std::move(row));
     }
 
     return this; 
@@ -455,8 +455,8 @@ void SMySQL::connect()
   do {
 
 #if MYSQL_VERSION_ID >= 50013
-    my_bool reconnect = 0;
-    mysql_options(&d_db, MYSQL_OPT_RECONNECT, &reconnect);
+    my_bool set_reconnect = 0;
+    mysql_options(&d_db, MYSQL_OPT_RECONNECT, &set_reconnect);
 #endif
 
 #if MYSQL_VERSION_ID >= 50100

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "ZONE2SQL" "1" "Nov 29, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "ZONE2SQL" "1" "Apr 06, 2020" "" "PowerDNS Authoritative Server"
 .SH NAME
 zone2sql \- convert BIND zones to SQL
 .
@@ -45,7 +45,7 @@ For backends supporting slave operation there is also an option to keep
 slave zones as slaves, and not convert them to native operation.
 .sp
 \fBzone2sql\fP can generate SQL for the Generic MySQL, Generic PostgreSQL,
-Generic SQLite3 and Generic Oracle backends.
+Generic SQLite3 backend.
 .SH OPTIONS
 .SH INPUT OPTIONS
 .INDENT 0.0
@@ -74,17 +74,6 @@ Generic PostgreSQL backend.
 .B \-\-gsqlite
 Output in format suitable for the default configuration of the
 Generic SQLite3 backend.
-.TP
-.B \-\-goracle
-Output in format suitable for the default configuration of the
-Generic Oracle backend.
-.TP
-.B \-\-mydns
-Output in a format suitable for the MyDNS backend.
-.TP
-.B \-\-oracle
-Output in format suitable for the default configuration of the
-Oracle backend.
 .UNINDENT
 .SH OUTPUT OPTIONS
 .INDENT 0.0

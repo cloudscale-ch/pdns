@@ -19,8 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef WEBSERVER_HH
-#define WEBSERVER_HH
+#pragma once
 #include <map>
 #include <string>
 #include <list>
@@ -30,11 +29,9 @@
 #include "namespaces.hh"
 #include "sstuff.hh"
 
-class WebServer;
-
 class HttpRequest : public YaHTTP::Request {
 public:
-  HttpRequest(const string& logprefix="") : YaHTTP::Request(), accept_json(false), accept_html(false), complete(false), logprefix(logprefix) { };
+  HttpRequest(const string& logprefix_="") : YaHTTP::Request(), accept_json(false), accept_html(false), complete(false), logprefix(logprefix_) { };
 
   bool accept_json;
   bool accept_html;
@@ -127,7 +124,7 @@ public:
 class ApiException : public runtime_error
 {
 public:
-  ApiException(const string& what) : runtime_error(what) {
+  ApiException(const string& what_arg) : runtime_error(what_arg) {
   }
 };
 
@@ -244,5 +241,3 @@ protected:
   // Describes the amount of logging the webserver does
   WebServer::LogLevel d_loglevel{WebServer::LogLevel::Detailed};
 };
-
-#endif /* WEBSERVER_HH */

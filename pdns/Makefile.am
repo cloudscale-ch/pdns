@@ -47,6 +47,7 @@ EXTRA_DIST = \
 	effective_tld_names.dat \
 	mtasker.cc \
 	inflighter.cc \
+	bind-dnssec.4.2.0_to_4.3.0_schema.sqlite3.sql \
 	bind-dnssec.schema.sqlite3.sql \
 	bindparser.h \
 	named.conf.parsertest \
@@ -208,6 +209,7 @@ pdns_server_SOURCES = \
 	resolver.cc resolver.hh \
 	responsestats.cc responsestats.hh responsestats-auth.cc \
 	rfc2136handler.cc \
+	secpoll.cc secpoll.hh \
 	secpoll-auth.cc secpoll-auth.hh \
 	serialtweaker.cc \
 	sha.hh \
@@ -265,10 +267,6 @@ endif
 if SQLITE3
 pdns_server_SOURCES += ssqlite3.cc ssqlite3.hh
 pdns_server_LDADD += $(SQLITE3_LIBS)
-endif
-
-if ORACLE
-pdns_server_LDADD += $(ORACLE_LIBS)
 endif
 
 if PKCS11
@@ -367,10 +365,6 @@ endif
 if SQLITE3
 pdnsutil_SOURCES += ssqlite3.cc ssqlite3.hh
 pdnsutil_LDADD += $(SQLITE3_LIBS)
-endif
-
-if ORACLE
-pdnsutil_LDADD += $(ORACLE_LIBS)
 endif
 
 if PKCS11
@@ -1257,7 +1251,7 @@ endif
 endif
 
 pdns.conf-dist: pdns_server
-	$(AM_V_GEN)./pdns_server --no-config --config 2>/dev/null > $@
+	$(AM_V_GEN)./pdns_server --no-config --config=default 2>/dev/null > $@
 
 testrunner_SOURCES = \
 	arguments.cc \
@@ -1559,7 +1553,7 @@ dnsdist:
 
 if HAVE_SYSTEMD
 pdns.service: pdns.service.in
-	$(AM_V_GEN)sed -e 's![@]sbindir[@]!$(sbindir)!' < $< > $@
+	$(AM_V_GEN)sed -e 's![@]sbindir[@]!$(sbindir)!' -e 's![@]service_user[@]!$(service_user)!' -e 's![@]service_group[@]!$(service_group)!' < $< > $@
 if !HAVE_SYSTEMD_LOCK_PERSONALITY
 	$(AM_V_GEN)perl -ni -e 'print unless /^LockPersonality/' $@
 endif

@@ -20,6 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #pragma once
+#include <cstring>
 #include <string>
 #include <vector>
 #include <set>
@@ -62,9 +63,10 @@ class DNSName
 {
 public:
   DNSName()  {}          //!< Constructs an *empty* DNSName, NOT the root!
-  explicit DNSName(const char* p);      //!< Constructs from a human formatted, escaped presentation
-  explicit DNSName(const std::string& str) : DNSName(str.c_str()) {}; //!< Constructs from a human formatted, escaped presentation
-  DNSName(const char* p, int len, int offset, bool uncompress, uint16_t* qtype=0, uint16_t* qclass=0, unsigned int* consumed=0, uint16_t minOffset=0); //!< Construct from a DNS Packet, taking the first question if offset=12
+  explicit DNSName(const char* p): DNSName(p, std::strlen(p)) {} //!< Constructs from a human formatted, escaped presentation
+  explicit DNSName(const char* p, size_t len);      //!< Constructs from a human formatted, escaped presentation
+  explicit DNSName(const std::string& str) : DNSName(str.c_str(), str.length()) {}; //!< Constructs from a human formatted, escaped presentation
+  DNSName(const char* p, int len, int offset, bool uncompress, uint16_t* qtype=nullptr, uint16_t* qclass=nullptr, unsigned int* consumed=nullptr, uint16_t minOffset=0); //!< Construct from a DNS Packet, taking the first question if offset=12. If supplied, consumed is set to the number of bytes consumed from the packet, which will not be equal to the wire length of the resulting name in case of compression.
   
   bool isPartOf(const DNSName& rhs) const;   //!< Are we part of the rhs name?
   inline bool operator==(const DNSName& rhs) const; //!< DNS-native comparison (case insensitive) - empty compares to empty
@@ -146,12 +148,14 @@ public:
   const string_t& getStorage() const {
     return d_storage;
   }
+
+  bool has8bitBytes() const; /* returns true if at least one byte of the labels forming the name is not included in [A-Za-z0-9_*./@ \\:-] */
+
 private:
   string_t d_storage;
 
   void packetParser(const char* p, int len, int offset, bool uncompress, uint16_t* qtype, uint16_t* qclass, unsigned int* consumed, int depth, uint16_t minOffset);
-  static std::string escapeLabel(const std::string& orig);
-  static std::string escapeLabel(const char* orig, size_t len);
+  static void appendEscapedLabel(std::string& appendTo, const char* orig, size_t len);
   static std::string unescapeLabel(const std::string& orig);
 };
 
@@ -243,6 +247,17 @@ struct SuffixMatchTree
       d_value = rhs.d_value;
     }
   }
+  SuffixMatchTree & operator=(const SuffixMatchTree &rhs)
+  {
+    d_name = rhs.d_name;
+    children = rhs.children;
+    endNode = rhs.endNode;
+    if (endNode) {
+      d_value = rhs.d_value;
+    }
+    return *this;
+  }
+  
   std::string d_name;
   mutable std::set<SuffixMatchTree> children;
   mutable bool endNode;
@@ -300,6 +315,11 @@ struct SuffixMatchTree
    */
   void remove(std::vector<std::string> labels) const
   {
+    if (labels.empty()) { // this allows removal of the root
+      endNode = false;
+      return;
+    }
+
     SuffixMatchTree smt(*labels.rbegin());
     auto child = children.find(smt);
     if (child == children.end()) {
@@ -329,8 +349,9 @@ struct SuffixMatchTree
     if(children.empty()) { // speed up empty set
       if(endNode)
         return &d_value;
-      return 0;
+      return nullptr;
     }
+
     return lookup(name.getRawLabels());
   }
 
@@ -339,7 +360,7 @@ struct SuffixMatchTree
     if(labels.empty()) { // optimization
       if(endNode)
         return &d_value;
-      return 0;
+      return nullptr;
     }
 
     SuffixMatchTree smn(*labels.rbegin());
@@ -347,10 +368,14 @@ struct SuffixMatchTree
     if(child == children.end()) {
       if(endNode)
         return &d_value;
-      return 0;
+      return nullptr;
     }
     labels.pop_back();
-    return child->lookup(labels);
+    auto result = child->lookup(labels);
+    if (result) {
+      return result;
+    }
+    return endNode ? &d_value : nullptr;
   }
 
   // Returns all end-nodes, fully qualified (not as separate labels)
@@ -382,6 +407,11 @@ struct SuffixMatchNode
     {
       d_tree.add(dnsname, true);
       d_nodes.insert(dnsname);
+    }
+
+    void add(const std::string& name)
+    {
+      add(DNSName(name));
     }
 
     void add(std::vector<std::string> labels)
@@ -443,7 +473,7 @@ namespace std {
     };
 }
 
-DNSName::string_t segmentDNSNameRaw(const char* input); // from ragel
+DNSName::string_t segmentDNSNameRaw(const char* input, size_t inputlen); // from ragel
 bool DNSName::operator==(const DNSName& rhs) const
 {
   if(rhs.empty() != empty() || rhs.d_storage.size() != d_storage.size())

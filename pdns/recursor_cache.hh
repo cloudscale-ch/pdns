@@ -19,8 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef RECURSOR_CACHE_HH
-#define RECURSOR_CACHE_HH
+#pragma once
 #include <string>
 #include <set>
 #include "dns.hh"
@@ -73,7 +72,7 @@ private:
   struct CacheEntry
   {
     CacheEntry(const boost::tuple<DNSName, uint16_t, Netmask>& key, bool auth):
-      d_qname(key.get<0>()), d_netmask(key.get<2>()), d_state(Indeterminate), d_ttd(0), d_qtype(key.get<1>()), d_auth(auth)
+      d_qname(key.get<0>()), d_netmask(key.get<2>().getNormalized()), d_state(Indeterminate), d_ttd(0), d_qtype(key.get<1>()), d_auth(auth)
     {
     }
 
@@ -107,7 +106,7 @@ private:
   class ECSIndexEntry
   {
   public:
-    ECSIndexEntry(const DNSName& qname, uint16_t qtype): d_nmt(true), d_qname(qname), d_qtype(qtype)
+    ECSIndexEntry(const DNSName& qname, uint16_t qtype): d_nmt(), d_qname(qname), d_qtype(qtype)
     {
     }
 
@@ -219,4 +218,3 @@ public:
     }
   }
 };
-#endif

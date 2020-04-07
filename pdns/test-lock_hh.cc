@@ -24,9 +24,9 @@ static void lthread()
 BOOST_AUTO_TEST_CASE(test_pdns_lock)
 {
   for(unsigned int n=0; n < 1000; ++n) {
-    auto p = new pthread_rwlock_t;
-    pthread_rwlock_init(p, 0);
-    g_locks.emplace_back(p);
+    auto p = make_unique<pthread_rwlock_t>();
+    pthread_rwlock_init(p.get(), 0);
+    g_locks.emplace_back(std::move(p));
   }
 
   std::vector<ReadLock> rlocks;
@@ -57,7 +57,9 @@ BOOST_AUTO_TEST_CASE(test_pdns_lock)
   TryReadLock trl2(&*g_locks[0]);
   BOOST_CHECK(trl2.gotIt());
   
-  
+  for(auto& pp : g_locks) {
+    pthread_rwlock_destroy(pp.get());
+  }  
 }
 
 BOOST_AUTO_TEST_SUITE_END()

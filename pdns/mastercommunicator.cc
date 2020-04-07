@@ -52,7 +52,7 @@ void CommunicatorClass::queueNotifyDomain(const DomainInfo& di, UeberBackend* B)
 
   try {
   if (d_onlyNotify.size()) {
-    B->lookup(QType(QType::NS), di.zone, nullptr, di.id);
+    B->lookup(QType(QType::NS), di.zone, di.id);
     while(B->get(rr))
       nsset.insert(getRR<NSRecordContent>(rr.dr)->getNS().toString());
 
@@ -120,8 +120,9 @@ bool CommunicatorClass::notifyDomain(const DNSName &domain, UeberBackend* B)
     return false;
   }
   queueNotifyDomain(di, B);
-  // call backend and tell them we sent out the notification - even though that is premature    
-  di.backend->setNotified(di.id, di.serial);
+  // call backend and tell them we sent out the notification - even though that is premature
+  if (di.serial != di.notified_serial)
+    di.backend->setNotified(di.id, di.serial);
 
   return true; 
 }

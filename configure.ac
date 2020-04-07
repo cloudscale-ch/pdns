@@ -1,6 +1,6 @@
 AC_PREREQ([2.61])
 
-AC_INIT([pdns], [4.2.1])
+AC_INIT([pdns], [4.3.0])
 
 AC_CONFIG_SRCDIR([pdns/receiver.cc])
 AC_CONFIG_MACRO_DIR([m4])
@@ -18,8 +18,8 @@ AM_SILENT_RULES([yes])
 
 AC_CANONICAL_HOST
 # Add some default CFLAGS and CXXFLAGS, can be appended to using the environment variables
-CFLAGS="-Wall -g -O2 $CFLAGS"
-CXXFLAGS="-Wall -g -O2 $CXXFLAGS"
+CFLAGS="-g -O2 -Wall -Wextra -Wshadow -Wno-unused-parameter $CFLAGS"
+CXXFLAGS="-g -O2 -Wall -Wextra -Wshadow -Wno-unused-parameter $CXXFLAGS"
 
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -45,7 +45,7 @@ m4_pattern_forbid([^_?PKG_[A-Z_]+$], [*** pkg.m4 missing, please install pkg-con
 PDNS_CHECK_OS
 PTHREAD_SET_NAME
 
-PDNS_WITH_LUA
+PDNS_WITH_LUA([mandatory])
 PDNS_CHECK_LUA_HPP
 
 AX_CXX_COMPILE_STDCXX_11
@@ -130,7 +130,9 @@ PDNS_CHECK_VIRTUALENV
 PDNS_FROM_GIT
 
 dnl Checks for library functions.
-AC_CHECK_FUNCS_ONCE([strcasestr localtime_r recvmmsg sched_setscheduler getrandom arc4random])
+dnl the *_r functions are in posix so we can use them unconditionally, but the ext/yahttp code is
+dnl using the defines.
+AC_CHECK_FUNCS_ONCE([strcasestr localtime_r gmtime_r recvmmsg sched_setscheduler getrandom arc4random])
 
 AM_CONDITIONAL([HAVE_RECVMMSG], [test "x$ac_cv_func_recvmmsg" = "xyes"])
 
@@ -173,14 +175,10 @@ AS_IF([test x"$dynmodules" = "xno"], [dynmodules=""])
 
 for a in $modules $dynmodules; do
   case "$a" in
-    oracle|goracle)
-      PDNS_WITH_ORACLE
-      needoracle=yes
-      ;;
     godbc)
       PDNS_WITH_UNIXODBC
       ;;
-    mydns|gmysql)
+    gmysql)
       PDNS_WITH_MYSQL
       ;;
     gpgsql)
@@ -193,9 +191,6 @@ for a in $modules $dynmodules; do
       PDNS_CHECK_LDAP
       needldap=yes
       ;;
-    opendbx)
-      PDNS_CHECK_OPENDBX
-      ;;
     remote)
       AS_IF([test "x$enable_unit_tests" = "xyes"],
         [PDNS_CHECK_CURL_PROGRAM]
@@ -203,20 +198,17 @@ for a in $modules $dynmodules; do
       have_remotebackend=yes
       ;;
     tinydns)
+      needcdb=yes
       PDNS_CHECK_CDB
       ;;
     geoip)
       PDNS_CHECK_GEOIP
       ;;
     lua*)
-      AS_IF([test "x$with_lua" = "xno"],
-        [AC_MSG_ERROR([${a} backend needs lua, run ./configure --with-lua])]
-      )
-      AS_IF([test "x$LUAPC" = "x"],
-        [AC_MSG_ERROR([${a} backend needs lua but we cannot find it])]
-      )
+      dnl Lua has been checked above
       ;;
     lmdb)
+      needlmdb=yes
       PDNS_CHECK_LMDB
       BOOST_SERIALIZATION
       ;;
@@ -232,12 +224,31 @@ PDNS_WITH_PROTOBUF
 
 PDNS_WITH_LUA_RECORDS
 
-AM_CONDITIONAL([ORACLE], [test "x$needoracle" = "xyes"])
-
 AM_CONDITIONAL([LDAP], [test "x$needldap" = "xyes"])
 
 PDNS_CHECK_SQLITE3
 AM_CONDITIONAL([SQLITE3], [test "x$needsqlite3" = "xyes"])
+
+AM_CONDITIONAL([LMDB], [test "x$needlmdb" != "x"])
+AM_CONDITIONAL([HAVE_LMDB], [test "x$LMDB_LIBS" != "x"])
+
+AS_IF([test "x$needlmdb" = "xyes"], [
+  AS_IF([test "$with_lmdb" = "no"], [
+    AC_MSG_ERROR([--with-lmdb is set to 'no', but lmdb support is required])
+  ])
+  AS_IF([test "x$HAVE_LMDB" != "x1"], [
+    AC_MSG_ERROR([lmdb not found via pkg-config, please install lmdb or set --with-lmdb to your lmdb installation directory])
+  ])
+])
+
+AM_CONDITIONAL([CDB], [test "x$needcdb" != "x"])
+AM_CONDITIONAL([HAVE_CDB], [test "x$CDB_LIBS" != "x"])
+
+AS_IF([test "x$needcdb" = "xyes"], [
+  AS_IF([test "x$HAVE_CDB" != "x1"], [
+    AC_MSG_ERROR([cdb not found via pkg-config, please install cdb])
+  ])
+])
 
 for a in $modules; do
   AC_MSG_CHECKING([whether we can build module "${a}"])
@@ -269,6 +280,7 @@ done
 AX_AVAILABLE_SYSTEMD
 AX_CHECK_SYSTEMD_FEATURES
 AM_CONDITIONAL([HAVE_SYSTEMD], [ test x"$systemd" = "xy" ])
+ PDNS_WITH_SERVICE_USER([pdns])
 
 LDFLAGS="$RELRO_LDFLAGS $LDFLAGS"
 
@@ -317,16 +329,11 @@ AC_CONFIG_FILES([
   modules/geoipbackend/Makefile
   modules/gmysqlbackend/Makefile
   modules/godbcbackend/Makefile
-  modules/goraclebackend/Makefile
   modules/gpgsqlbackend/Makefile
   modules/gsqlite3backend/Makefile
   modules/ldapbackend/Makefile
   modules/lmdbbackend/Makefile
-  modules/luabackend/Makefile
   modules/lua2backend/Makefile
-  modules/mydnsbackend/Makefile
-  modules/opendbxbackend/Makefile
-  modules/oraclebackend/Makefile
   modules/pipebackend/Makefile
   modules/randombackend/Makefile
   modules/remotebackend/Makefile

@@ -19,46 +19,18 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef SORACLE_HH
-#define SORACLE_HH
+#pragma once
+#include <string>
+#include <vector>
+#include "dnsrecords.hh"
 
-#include "pdns/backends/gsql/ssql.hh"
-#include "pdns/utility.hh"
-#include <oci.h>
-#include <oratypes.h>
-#include "pdns/misc.hh"
-
-#ifndef dsword
-typedef sb4 dsword;
-#endif
-
-class SOracle : public SSql
-{
-public:
-  SOracle(const string &database,
-          const string &user="",
-          const string &password="", 
-          bool releaseStatements=false,
-          OCIEnv* oraenv=NULL);
-
-  ~SOracle();
-
-  SSqlException sPerrorException(const string &reason);
-  void setLog(bool state);
-  std::unique_ptr<SSqlStatement> prepare(const string& query, int nparams);
-  void execute(const string& query);
-
-  void startTransaction();
-  void commit();
-  void rollback();
-private:
-  OCIEnv*    d_environmentHandle;
-  OCIError*  d_errorHandle;
-  OCISvcCtx* d_serviceContextHandle;
-
-  string getOracleError();
-  static bool s_dolog;
-  bool d_release_stmt;
-};
-
-#endif /* SSORACLE_HH */
+/* Parses the result of a security poll, will throw a PDNSException when it could not be parsed, secPollStatus is
+ * set correctly regardless whether or not an exception was thrown.
+ *
+ * res: DNS Rcode result from the secpoll
+ * ret: Records returned during secpoll
+ * secPollStatus: The actual secpoll status, pass the current status in here and it is changed to the new status
+ * secPollMessage: Will be cleared and filled with the message from the secpoll message
+ */
+void processSecPoll(const int res, const std::vector<DNSRecord> &ret, int &secPollStatus, std::string &secPollMessage);
+bool isReleaseVersion(const std::string &version);

@@ -9,8 +9,13 @@ EXTRA_DIST = \
 	contrib/powerdns.solaris.init.d \
 	pdns/named.conf.parsertest \
 	regression-tests/zones/unit.test \
+	regression-tests/zones/unit2.test \
 	builder-support/gen-version
 
 ACLOCAL_AMFLAGS = -I m4
 
 dvi: # do nothing to build dvi
+
+format-code:
+	./build-scripts/format-code `find modules pdns -type f -name '*.[ch][ch]'`
+

@@ -66,6 +66,7 @@ void BackendFactory::declare(const string &suffix, const string &param, const st
 {
   string fullname=d_name+suffix+"-"+param;
   arg().set(fullname,help)=value;
+  arg().setDefault(fullname,value);
 }
 
 const string &BackendFactory::getName() const
@@ -221,7 +222,7 @@ vector<DNSBackend *>BackendMakerClass::all(bool metadataOnly)
 */
 bool DNSBackend::getSOA(const DNSName &domain, SOAData &sd)
 {
-  this->lookup(QType(QType::SOA),domain);
+  this->lookup(QType(QType::SOA),domain,-1);
 
   DNSResourceRecord rr;
   rr.auth = true;
@@ -323,7 +324,7 @@ void fillSOAData(const DNSZoneRecord& in, SOAData& sd)
   sd.refresh = src->d_st.refresh;
   sd.retry = src->d_st.retry;
   sd.expire = src->d_st.expire;
-  sd.default_ttl = src->d_st.minimum;
+  sd.minimum = src->d_st.minimum;
 }
 
 std::shared_ptr<DNSRecordContent> makeSOAContent(const SOAData& sd)
@@ -333,7 +334,7 @@ std::shared_ptr<DNSRecordContent> makeSOAContent(const SOAData& sd)
     st.refresh = sd.refresh;
     st.retry = sd.retry;
     st.expire = sd.expire;
-    st.minimum = sd.default_ttl;
+    st.minimum = sd.minimum;
     return std::make_shared<SOARecordContent>(sd.nameserver, sd.hostmaster, st);
 }
 
@@ -346,6 +347,7 @@ void fillSOAData(const string &content, SOAData &data)
   // fill out data with some plausible defaults:
   // 10800 3600 604800 3600
   vector<string>parts;
+  parts.reserve(7);
   stringtok(parts,content);
   int pleft=parts.size();
 
@@ -369,7 +371,7 @@ void fillSOAData(const string &content, SOAData &data)
     data.expire = pleft > 5 ? pdns_stou(parts[5].c_str())
       : ::arg().asNum("soa-expire-default");
 
-    data.default_ttl = pleft > 6 ? pdns_stou(parts[6].c_str())
+    data.minimum = pleft > 6 ? pdns_stou(parts[6].c_str())
       : ::arg().asNum("soa-minimum-ttl");
   }
   catch(const std::out_of_range& oor) {

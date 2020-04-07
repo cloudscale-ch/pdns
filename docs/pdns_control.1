@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "PDNS_CONTROL" "1" "Nov 29, 2019" "4.2" "PowerDNS Authoritative Server"
+.TH "PDNS_CONTROL" "1" "Apr 06, 2020" "" "PowerDNS Authoritative Server"
 .SH NAME
 pdns_control \- Control the PowerDNS nameserver
 .
@@ -70,6 +70,12 @@ Where the controlsocket lives.
 When using the BIND backend, add a zone. This zone is added in\-memory
 and served immediately. Note that this does not add the zone to the
 bind\-config file. \fIFILENAME\fP must be an absolute path.
+.SS bind\-domain\-extended\-status [\fIDOMAIN\fP\&...]
+.sp
+Output an extended status of all domains, containing much more information than
+the simple domain status, like the number of records currently loaded, whether pdns
+is master or slave for the domain, the list of masters, various timers, etc
+Optionally, append \fIDOMAIN\fPs to get the status of specific zones.
 .SS bind\-domain\-status [\fIDOMAIN\fP\&...]
 .sp
 When using the BIND backend, list status of all domains. Optionally,
@@ -83,12 +89,9 @@ When using the BIND backend, immediately reload \fIDOMAIN\fP from disk.
 .SS ccounts
 .sp
 Show the content of the cache.
-.SS current\-config
+.SS current\-config [diff]
 .sp
-Show the currently running configuration. The output has the same
-format as \fBpdns_server \-\-config\fP\&. You\(aqll notice that all the are
-uncommented. This is because PowerDNS simply has values, and the
-default isn\(aqt known at runtime.
+Show the currently running configuration. The output has the same format as \fBpdns_server \-\-config\fP\&. With the diff option only modified options are included in the output.
 .SS cycle
 .sp
 Restart the nameserver so it reloads its configuration. Only works

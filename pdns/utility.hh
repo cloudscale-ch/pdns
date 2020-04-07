@@ -20,9 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 // Utility class specification.
-
-#ifndef UTILITY_HH
-#define UTILITY_HH
+#pragma once
 
 #ifdef NEED_POSIX_TYPEDEF
 typedef unsigned char uint8_t;
@@ -59,7 +57,7 @@ private:
   sem_value_t     m_count;
   uint32_t       m_nwaiters;
 #else
-  sem_t *m_pSemaphore;
+  std::unique_ptr<sem_t> m_pSemaphore;
 #endif
 
 protected:
@@ -120,12 +118,6 @@ public:
   //! The inet_ntop() function converts an address from network format (usually a struct in_addr or some other binary form, in network byte order) to presentation format.
   static const char *inet_ntop( int af, const char *src, char *dst, size_t size );
 
-  //! Retrieves a gid using a groupname.
-  static int makeGidNumeric( const string & group );
-  
-  //! Retrieves an uid using an username.
-  static int makeUidNumeric( const string & username );
-
   //! Writes a vector.
   static int writev( Utility::sock_t socket, const iovec *vector, size_t count );
 
@@ -133,10 +125,10 @@ public:
   static void srandom(void);
 
   //! Drops the program's group privileges.
-  static void dropGroupPrivs( int uid, int gid );
+  static void dropGroupPrivs( uid_t uid, gid_t gid );
 
   //! Drops the program's user privileges.
-  static void dropUserPrivs( int uid );
+  static void dropUserPrivs( uid_t uid );
   
   //! Sets the socket into Bind-any mode
   static void setBindAny ( int af, Utility::sock_t socket );
@@ -150,6 +142,3 @@ public:
   static time_t timegm(struct tm *tm);
   
 };
-
-
-#endif // UTILITY_HH

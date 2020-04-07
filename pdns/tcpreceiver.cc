@@ -67,9 +67,9 @@ extern StatBag S;
 */
 
 pthread_mutex_t TCPNameserver::s_plock = PTHREAD_MUTEX_INITIALIZER;
-Semaphore *TCPNameserver::d_connectionroom_sem;
+std::unique_ptr<Semaphore> TCPNameserver::d_connectionroom_sem{nullptr};
+std::unique_ptr<PacketHandler> TCPNameserver::s_P{nullptr};
 unsigned int TCPNameserver::d_maxTCPConnections = 0;
-PacketHandler *TCPNameserver::s_P; 
 NetmaskGroup TCPNameserver::d_ng;
 size_t TCPNameserver::d_maxTransactionsPerConn;
 size_t TCPNameserver::d_maxConnectionsPerClient;
@@ -81,9 +81,9 @@ std::map<ComboAddress,size_t,ComboAddress::addressOnlyLessThan> TCPNameserver::s
 void TCPNameserver::go()
 {
   g_log<<Logger::Error<<"Creating backend connection for TCP"<<endl;
-  s_P=0;
+  s_P.reset();
   try {
-    s_P=new PacketHandler;
+    s_P=make_unique<PacketHandler>();
   }
   catch(PDNSException &ae) {
     g_log<<Logger::Error<<"TCP server is unable to launch backends - will try again when questions come in: "<<ae.reason<<endl;
@@ -200,7 +200,7 @@ void connectWithTimeout(int fd, struct sockaddr* remote, size_t socklen)
   ;
 }
 
-void TCPNameserver::sendPacket(shared_ptr<DNSPacket> p, int outsock)
+void TCPNameserver::sendPacket(std::unique_ptr<DNSPacket>& p, int outsock)
 {
   g_rs.submitResponse(*p, false);
 
@@ -255,7 +255,7 @@ void TCPNameserver::decrementClientCount(const ComboAddress& remote)
 void *TCPNameserver::doConnection(void *data)
 {
   setThreadName("pdns/tcpConnect");
-  shared_ptr<DNSPacket> packet;
+  std::unique_ptr<DNSPacket> packet;
   // Fix gcc-4.0 error (on AMD64)
   int fd=(int)(long)data; // gotta love C (generates a harmless warning on opteron)
   ComboAddress remote;
@@ -328,7 +328,7 @@ void *TCPNameserver::doConnection(void *data)
       else
         S.inc("tcp4-queries");
 
-      packet=shared_ptr<DNSPacket>(new DNSPacket(true));
+      packet=make_unique<DNSPacket>(true);
       packet->setRemote(&remote);
       packet->d_tcp=true;
       packet->setSocket(fd);
@@ -347,8 +347,8 @@ void *TCPNameserver::doConnection(void *data)
         continue;
       }
 
-      shared_ptr<DNSPacket> reply; 
-      shared_ptr<DNSPacket> cached= shared_ptr<DNSPacket>(new DNSPacket(false));
+      std::unique_ptr<DNSPacket> reply; 
+      auto cached = make_unique<DNSPacket>(false);
       if(logDNSQueries)  {
         string remote_text;
         if(packet->hasEDNSSubnet())
@@ -356,13 +356,13 @@ void *TCPNameserver::doConnection(void *data)
         else
           remote_text = packet->getRemote().toString();
         g_log << Logger::Notice<<"TCP Remote "<< remote_text <<" wants '" << packet->qdomain<<"|"<<packet->qtype.getName() <<
-        "', do = " <<packet->d_dnssecOk <<", bufsize = "<< packet->getMaxReplyLen()<<": ";
+        "', do = " <<packet->d_dnssecOk <<", bufsize = "<< packet->getMaxReplyLen();
       }
 
       if(PC.enabled()) {
-        if(packet->couldBeCached() && PC.get(packet.get(), cached.get())) { // short circuit - does the PacketCache recognize this question?
+        if(packet->couldBeCached() && PC.get(*packet, *cached)) { // short circuit - does the PacketCache recognize this question?
           if(logDNSQueries)
-            g_log<<"packetcache HIT"<<endl;
+            g_log<<": packetcache HIT"<<endl;
           cached->setRemote(&packet->d_remote);
           cached->d.id=packet->d.id;
           cached->d.rd=packet->d.rd; // copy in recursion desired bit
@@ -372,16 +372,20 @@ void *TCPNameserver::doConnection(void *data)
           continue;
         }
         if(logDNSQueries)
-            g_log<<"packetcache MISS"<<endl;
+            g_log<<": packetcache MISS"<<endl;
+      } else {
+        if (logDNSQueries) {
+          g_log<<endl;
+        }
       }
       {
         Lock l(&s_plock);
         if(!s_P) {
           g_log<<Logger::Error<<"TCP server is without backend connections, launching"<<endl;
-          s_P=new PacketHandler;
+          s_P=make_unique<PacketHandler>();
         }
 
-        reply=shared_ptr<DNSPacket>(s_P->doQuestion(packet.get())); // we really need to ask the backend :-)
+        reply= s_P->doQuestion(*packet); // we really need to ask the backend :-)
       }
 
       if(!reply)  // unable to write an answer?
@@ -392,8 +396,7 @@ void *TCPNameserver::doConnection(void *data)
   }
   catch(PDNSException &ae) {
     Lock l(&s_plock);
-    delete s_P;
-    s_P = 0; // on next call, backend will be recycled
+    s_P.reset(); // on next call, backend will be recycled
     g_log<<Logger::Error<<"TCP nameserver had error, cycling backend: "<<ae.reason<<endl;
   }
   catch(NetworkError &e) {
@@ -422,7 +425,7 @@ void *TCPNameserver::doConnection(void *data)
 
 
 // call this method with s_plock held!
-bool TCPNameserver::canDoAXFR(shared_ptr<DNSPacket> q)
+bool TCPNameserver::canDoAXFR(std::unique_ptr<DNSPacket>& q)
 {
   if(::arg().mustDo("disable-axfr"))
     return false;
@@ -491,7 +494,7 @@ bool TCPNameserver::canDoAXFR(shared_ptr<DNSPacket> q)
         DNSResourceRecord rr;
         set<DNSName> nsset;
 
-        B->lookup(QType(QType::NS),q->qdomain);
+        B->lookup(QType(QType::NS),q->qdomain,sd.domain_id);
         while(B->get(rr)) 
           nsset.insert(DNSName(rr.content));
         for(const auto & j: nsset) {
@@ -539,9 +542,9 @@ namespace {
     bool d_auth;
   };
 
-  shared_ptr<DNSPacket> getFreshAXFRPacket(shared_ptr<DNSPacket> q)
+  static std::unique_ptr<DNSPacket> getFreshAXFRPacket(std::unique_ptr<DNSPacket>& q)
   {
-    shared_ptr<DNSPacket> ret = shared_ptr<DNSPacket>(q->replyPacket());
+    std::unique_ptr<DNSPacket> ret = std::unique_ptr<DNSPacket>(q->replyPacket());
     ret->setCompress(false);
     ret->d_dnssecOk=false; // RFC 5936, 2.2.5
     ret->d_tcp = true;
@@ -551,9 +554,9 @@ namespace {
 
 
 /** do the actual zone transfer. Return 0 in case of error, 1 in case of success */
-int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int outsock)
+int TCPNameserver::doAXFR(const DNSName &target, std::unique_ptr<DNSPacket>& q, int outsock)
 {
-  shared_ptr<DNSPacket> outpacket= getFreshAXFRPacket(q);
+  std::unique_ptr<DNSPacket> outpacket= getFreshAXFRPacket(q);
   if(q->d_dnssecOk)
     outpacket->d_dnssecOk=true; // RFC 5936, 2.2.5 'SHOULD'
 
@@ -566,7 +569,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
     DLOG(g_log<<"Looking for SOA"<<endl);    // find domain_id via SOA and list complete domain. No SOA, no AXFR
     if(!s_P) {
       g_log<<Logger::Error<<"TCP server is without backend connections in doAXFR, launching"<<endl;
-      s_P=new PacketHandler;
+      s_P=make_unique<PacketHandler>();
     }
 
     // canDoAXFR does all the ACL checks, and has the if(disable-axfr) shortcut, call it first.
@@ -594,7 +597,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
   }
 
   DNSSECKeeper dk(&db);
-  dk.clearCaches(target);
+  DNSSECKeeper::clearCaches(target);
   bool securedZone = dk.isSecuredZone(target);
   bool presignedZone = dk.isPresigned(target);
 
@@ -645,7 +648,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
   // SOA *must* go out first, our signing pipe might reorder
   DLOG(g_log<<"Sending out SOA"<<endl);
   DNSZoneRecord soa = makeEditedDNSZRFromSOAData(dk, sd);
-  outpacket->addRecord(soa);
+  outpacket->addRecord(DNSZoneRecord(soa));
   if(securedZone && !presignedZone) {
     set<DNSName> authSet;
     authSet.insert(target);
@@ -672,12 +675,12 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
   DNSZoneRecord zrr;
   
   zrr.dr.d_name = target;
-  zrr.dr.d_ttl = sd.default_ttl;
+  zrr.dr.d_ttl = sd.minimum;
   zrr.auth = 1; // please sign!
 
   string publishCDNSKEY, publishCDS;
-  dk.getFromMeta(q->qdomain, "PUBLISH-CDNSKEY", publishCDNSKEY);
-  dk.getFromMeta(q->qdomain, "PUBLISH-CDS", publishCDS);
+  dk.getPublishCDNSKEY(q->qdomain, publishCDNSKEY);
+  dk.getPublishCDS(q->qdomain, publishCDS);
   vector<DNSZoneRecord> cds, cdnskey;
   DNSSECKeeper::keyset_t entryPoints = dk.getEntryPoints(q->qdomain);
   set<uint32_t> entryPointIds;
@@ -685,13 +688,16 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
     entryPointIds.insert(value.second.id);
 
   for(const DNSSECKeeper::keyset_t::value_type& value :  keys) {
+    if (!value.second.published) {
+      continue;
+    }
     zrr.dr.d_type = QType::DNSKEY;
     zrr.dr.d_content = std::make_shared<DNSKEYRecordContent>(value.first.getDNSKEY());
     DNSName keyname = NSEC3Zone ? DNSName(toBase32Hex(hashQNameWithSalt(ns3pr, zrr.dr.d_name))) : zrr.dr.d_name;
     NSECXEntry& ne = nsecxrepo[keyname];
     
     ne.d_set.set(zrr.dr.d_type);
-    ne.d_ttl = sd.default_ttl;
+    ne.d_ttl = sd.getNegativeTTL();
     csp.submit(zrr);
 
     // generate CDS and CDNSKEY records
@@ -715,9 +721,9 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
   }
   
   if(::arg().mustDo("direct-dnskey")) {
-    sd.db->lookup(QType(QType::DNSKEY), target, NULL, sd.domain_id);
+    sd.db->lookup(QType(QType::DNSKEY), target, sd.domain_id);
     while(sd.db->get(zrr)) {
-      zrr.dr.d_ttl = sd.default_ttl;
+      zrr.dr.d_ttl = sd.minimum;
       csp.submit(zrr);
     }
   }
@@ -894,7 +900,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
           keyname = NSEC3Zone ? DNSName(toBase32Hex(hashQNameWithSalt(ns3pr, loopZRR.dr.d_name))) : loopZRR.dr.d_name;
         }
         NSECXEntry& ne = nsecxrepo[keyname];
-        ne.d_ttl = sd.default_ttl;
+        ne.d_ttl = sd.getNegativeTTL();
         ne.d_auth = (ne.d_auth || loopZRR.auth || (NSEC3Zone && (!ns3pr.d_flags)));
         if (loopZRR.dr.d_type && loopZRR.dr.d_type != QType::RRSIG) {
           ne.d_set.set(loopZRR.dr.d_type);
@@ -942,7 +948,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
           n3rc.d_salt = ns3pr.d_salt;
           n3rc.d_flags = ns3pr.d_flags;
           n3rc.d_iterations = ns3pr.d_iterations;
-          n3rc.d_algorithm = DNSSECKeeper::SHA1; // SHA1, fixed in PowerDNS for now
+          n3rc.d_algorithm = DNSSECKeeper::DIGEST_SHA1; // SHA1, fixed in PowerDNS for now
           nsecxrepo_t::const_iterator inext = iter;
           ++inext;
           if(inext == nsecxrepo.end())
@@ -956,7 +962,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
           n3rc.d_nexthash = fromBase32Hex(inext->first.toStringNoDot());
           zrr.dr.d_name = iter->first+sd.qname;
 
-          zrr.dr.d_ttl = sd.default_ttl;
+          zrr.dr.d_ttl = sd.getNegativeTTL();
           zrr.dr.d_content = std::make_shared<NSEC3RecordContent>(std::move(n3rc));
           zrr.dr.d_type = QType::NSEC3;
           zrr.dr.d_place = DNSResourceRecord::ANSWER;
@@ -990,7 +996,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
         nrc.d_next=nsecxrepo.begin()->first;
       zrr.dr.d_name = iter->first;
 
-      zrr.dr.d_ttl = sd.default_ttl;
+      zrr.dr.d_ttl = sd.getNegativeTTL();
       zrr.dr.d_content = std::make_shared<NSECRecordContent>(std::move(nrc));
       zrr.dr.d_type = QType::NSEC;
       zrr.dr.d_place = DNSResourceRecord::ANSWER;
@@ -1037,7 +1043,7 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
   DLOG(g_log<<"Done writing out records"<<endl);
   /* and terminate with yet again the SOA record */
   outpacket=getFreshAXFRPacket(q);
-  outpacket->addRecord(soa);
+  outpacket->addRecord(std::move(soa));
   if(haveTSIGDetails && !tsigkeyname.empty())
     outpacket->setTSIGDetails(trc, tsigkeyname, tsigsecret, trc.d_mac, true); 
   
@@ -1049,9 +1055,9 @@ int TCPNameserver::doAXFR(const DNSName &target, shared_ptr<DNSPacket> q, int ou
   return 1;
 }
 
-int TCPNameserver::doIXFR(shared_ptr<DNSPacket> q, int outsock)
+int TCPNameserver::doIXFR(std::unique_ptr<DNSPacket>& q, int outsock)
 {
-  shared_ptr<DNSPacket> outpacket=getFreshAXFRPacket(q);
+  std::unique_ptr<DNSPacket> outpacket=getFreshAXFRPacket(q);
   if(q->d_dnssecOk)
     outpacket->d_dnssecOk=true; // RFC 5936, 2.2.5 'SHOULD'
 
@@ -1095,7 +1101,7 @@ int TCPNameserver::doIXFR(shared_ptr<DNSPacket> q, int outsock)
     DLOG(g_log<<"Looking for SOA"<<endl); // find domain_id via SOA and list complete domain. No SOA, no IXFR
     if(!s_P) {
       g_log<<Logger::Error<<"TCP server is without backend connections in doIXFR, launching"<<endl;
-      s_P=new PacketHandler;
+      s_P=make_unique<PacketHandler>();
     }
 
     // canDoAXFR does all the ACL checks, and has the if(disable-axfr) shortcut, call it first.
@@ -1111,7 +1117,7 @@ int TCPNameserver::doIXFR(shared_ptr<DNSPacket> q, int outsock)
   NSEC3PARAMRecordContent ns3pr;
   bool narrow;
 
-  dk.clearCaches(q->qdomain);
+  DNSSECKeeper::clearCaches(q->qdomain);
   bool securedZone = dk.isSecuredZone(q->qdomain);
   if(dk.getNSEC3PARAM(q->qdomain, &ns3pr, &narrow)) {
     if(narrow) {
@@ -1161,8 +1167,8 @@ int TCPNameserver::doIXFR(shared_ptr<DNSPacket> q, int outsock)
     // SOA *must* go out first, our signing pipe might reorder
     DLOG(g_log<<"Sending out SOA"<<endl);
     DNSZoneRecord soa = makeEditedDNSZRFromSOAData(dk, sd);
-    outpacket->addRecord(soa);
-    if(securedZone) {
+    outpacket->addRecord(std::move(soa));
+    if(securedZone && outpacket->d_dnssecOk) {
       set<DNSName> authSet;
       authSet.insert(target);
       addRRSigs(dk, signatureDB, authSet, outpacket->getRRS());
@@ -1184,7 +1190,6 @@ int TCPNameserver::doIXFR(shared_ptr<DNSPacket> q, int outsock)
 
 TCPNameserver::~TCPNameserver()
 {
-  delete d_connectionroom_sem;
 }
 
 TCPNameserver::TCPNameserver()
@@ -1195,126 +1200,71 @@ TCPNameserver::TCPNameserver()
   d_maxConnectionsPerClient = ::arg().asNum("max-tcp-connections-per-client");
 
 //  sem_init(&d_connectionroom_sem,0,::arg().asNum("max-tcp-connections"));
-  d_connectionroom_sem = new Semaphore( ::arg().asNum( "max-tcp-connections" ));
+  d_connectionroom_sem = make_unique<Semaphore>( ::arg().asNum( "max-tcp-connections" ));
   d_maxTCPConnections = ::arg().asNum( "max-tcp-connections" );
   d_tid=0;
+
   vector<string>locals;
+  stringtok(locals,::arg()["local-ipv6"]," ,");
   stringtok(locals,::arg()["local-address"]," ,");
-
-  vector<string>locals6;
-  stringtok(locals6,::arg()["local-ipv6"]," ,");
-
-  if(locals.empty() && locals6.empty())
-    throw PDNSException("No local address specified");
+  if(locals.empty())
+    throw PDNSException("No local addresses specified");
 
   d_ng.toMasks(::arg()["allow-axfr-ips"] );
 
   signal(SIGPIPE,SIG_IGN);
 
-  for(vector<string>::const_iterator laddr=locals.begin();laddr!=locals.end();++laddr) {
-    int s=socket(AF_INET,SOCK_STREAM,0); 
-    
-    if(s<0) 
-      throw PDNSException("Unable to acquire TCP socket: "+stringerror());
+  for(auto const &laddr : locals) {
+    ComboAddress local(laddr, ::arg().asNum("local-port"));
 
+    int s=socket(local.sin4.sin_family, SOCK_STREAM, 0);
+    if(s<0)
+      throw PDNSException("Unable to acquire TCP socket: "+stringerror());
     setCloseOnExec(s);
 
-    ComboAddress local(*laddr, ::arg().asNum("local-port"));
-      
     int tmp=1;
-    if(setsockopt(s,SOL_SOCKET,SO_REUSEADDR,(char*)&tmp,sizeof tmp)<0) {
+    if(setsockopt(s, SOL_SOCKET,SO_REUSEADDR, (char*)&tmp, sizeof tmp) < 0) {
       g_log<<Logger::Error<<"Setsockopt failed"<<endl;
-      _exit(1);  
+      _exit(1);
     }
 
     if (::arg().asNum("tcp-fast-open") > 0) {
 #ifdef TCP_FASTOPEN
       int fastOpenQueueSize = ::arg().asNum("tcp-fast-open");
       if (setsockopt(s, IPPROTO_TCP, TCP_FASTOPEN, &fastOpenQueueSize, sizeof fastOpenQueueSize) < 0) {
-        g_log<<Logger::Error<<"Failed to enable TCP Fast Open for listening socket: "<<strerror(errno)<<endl;
+        g_log<<Logger::Error<<"Failed to enable TCP Fast Open for listening socket "<<local.toStringWithPort()<<": "<<stringerror()<<endl;
       }
 #else
       g_log<<Logger::Warning<<"TCP Fast Open configured but not supported for listening socket"<<endl;
 #endif
     }
 
-    if( ::arg().mustDo("non-local-bind") )
-	Utility::setBindAny(AF_INET, s);
+    if(::arg().mustDo("non-local-bind"))
+      Utility::setBindAny(local.sin4.sin_family, s);
+
+    if(local.isIPv6() && setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &tmp, sizeof(tmp)) < 0) {
+      g_log<<Logger::Error<<"Failed to set IPv6 socket to IPv6 only, continuing anyhow: "<<stringerror()<<endl;
+    }
 
     if(::bind(s, (sockaddr*)&local, local.getSocklen())<0) {
+      int err = errno;
       close(s);
-      if( errno == EADDRNOTAVAIL && ! ::arg().mustDo("local-address-nonexist-fail") ) {
-        g_log<<Logger::Error<<"IPv4 Address " << *laddr << " does not exist on this server - skipping TCP bind" << endl;
+      if( err == EADDRNOTAVAIL && ! ::arg().mustDo("local-address-nonexist-fail") ) {
+        g_log<<Logger::Error<<"Address " << local.toString() << " does not exist on this server - skipping TCP bind" << endl;
         continue;
       } else {
-        g_log<<Logger::Error<<"Unable to bind to TCP socket " << *laddr << ": "<<strerror(errno)<<endl;
+        g_log<<Logger::Error<<"Unable to bind to TCP socket " << local.toStringWithPort() << ": "<<stringerror(err)<<endl;
         throw PDNSException("Unable to bind to TCP socket");
       }
     }
-    
-    listen(s,128);
+
+    listen(s, 128);
     g_log<<Logger::Error<<"TCP server bound to "<<local.toStringWithPort()<<endl;
     d_sockets.push_back(s);
     struct pollfd pfd;
     memset(&pfd, 0, sizeof(pfd));
     pfd.fd = s;
     pfd.events = POLLIN;
-
-    d_prfds.push_back(pfd);
-  }
-
-  for(vector<string>::const_iterator laddr=locals6.begin();laddr!=locals6.end();++laddr) {
-    int s=socket(AF_INET6,SOCK_STREAM,0); 
-
-    if(s<0) 
-      throw PDNSException("Unable to acquire TCPv6 socket: "+stringerror());
-
-    setCloseOnExec(s);
-
-    ComboAddress local(*laddr, ::arg().asNum("local-port"));
-
-    int tmp=1;
-    if(setsockopt(s,SOL_SOCKET,SO_REUSEADDR,(char*)&tmp,sizeof tmp)<0) {
-      g_log<<Logger::Error<<"Setsockopt failed"<<endl;
-      _exit(1);  
-    }
-
-    if (::arg().asNum("tcp-fast-open") > 0) {
-#ifdef TCP_FASTOPEN
-      int fastOpenQueueSize = ::arg().asNum("tcp-fast-open");
-      if (setsockopt(s, IPPROTO_TCP, TCP_FASTOPEN, &fastOpenQueueSize, sizeof fastOpenQueueSize) < 0) {
-        g_log<<Logger::Error<<"Failed to enable TCP Fast Open for listening socket: "<<strerror(errno)<<endl;
-      }
-#else
-      g_log<<Logger::Warning<<"TCP Fast Open configured but not supported for listening socket"<<endl;
-#endif
-    }
-
-    if( ::arg().mustDo("non-local-bind") )
-	Utility::setBindAny(AF_INET6, s);
-    if(setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &tmp, sizeof(tmp)) < 0) {
-      g_log<<Logger::Error<<"Failed to set IPv6 socket to IPv6 only, continuing anyhow: "<<strerror(errno)<<endl;
-    }
-    if(bind(s, (const sockaddr*)&local, local.getSocklen())<0) {
-      close(s);
-      if( errno == EADDRNOTAVAIL && ! ::arg().mustDo("local-ipv6-nonexist-fail") ) {
-        g_log<<Logger::Error<<"IPv6 Address " << *laddr << " does not exist on this server - skipping TCP bind" << endl;
-        continue;
-      } else {
-        g_log<<Logger::Error<<"Unable to bind to TCPv6 socket" << *laddr << ": "<<strerror(errno)<<endl;
-        throw PDNSException("Unable to bind to TCPv6 socket");
-      }
-    }
-    
-    listen(s,128);
-    g_log<<Logger::Error<<"TCPv6 server bound to "<<local.toStringWithPort()<<endl; // this gets %eth0 right
-    d_sockets.push_back(s);
-
-    struct pollfd pfd;
-    memset(&pfd, 0, sizeof(pfd));
-    pfd.fd = s;
-    pfd.events = POLLIN;
-
     d_prfds.push_back(pfd);
   }
 }
@@ -1342,9 +1292,10 @@ void TCPNameserver::thread()
           addrlen=remote.getSocklen();
 
           if((fd=accept(sock, (sockaddr*)&remote, &addrlen))<0) {
-            g_log<<Logger::Error<<"TCP question accept error: "<<strerror(errno)<<endl;
+            int err = errno;
+            g_log<<Logger::Error<<"TCP question accept error: "<<stringerror(err)<<endl;
             
-            if(errno==EMFILE) {
+            if(err==EMFILE) {
               g_log<<Logger::Error<<"TCP handler out of filedescriptors, exiting, won't recover from this"<<endl;
               _exit(1);
             }
@@ -1368,8 +1319,9 @@ void TCPNameserver::thread()
             if(room<1)
               g_log<<Logger::Warning<<"Limit of simultaneous TCP connections reached - raise max-tcp-connections"<<endl;
 
-            if(pthread_create(&tid, 0, &doConnection, reinterpret_cast<void*>(fd))) {
-              g_log<<Logger::Error<<"Error creating thread: "<<stringerror()<<endl;
+            int err;
+            if((err = pthread_create(&tid, 0, &doConnection, reinterpret_cast<void*>(fd)))) {
+              g_log<<Logger::Error<<"Error creating thread: "<<stringerror(err)<<endl;
               d_connectionroom_sem->post();
               close(fd);
               decrementClientCount(remote);

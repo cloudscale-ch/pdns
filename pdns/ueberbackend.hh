@@ -19,9 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef UEBERBACKEND_HH
-#define UEBERBACKEND_HH
-
+#pragma once
 #include <vector>
 #include <map>
 #include <string>
@@ -85,7 +83,7 @@ public:
     DNSBackend *d_hinterBackend;
 
     //! DNSPacket who asked this question
-    DNSPacket *pkt_p;
+    DNSPacket* pkt_p;
     DNSName qname;
 
     //! Index of the current backend within the backends vector
@@ -97,7 +95,7 @@ public:
     static AtomicCounter instances;
   };
 
-  void lookup(const QType &, const DNSName &qdomain, DNSPacket *pkt_p=0,  int zoneId=-1);
+  void lookup(const QType &, const DNSName &qdomain, int zoneId, DNSPacket *pkt_p=nullptr);
 
   /** Determines if we are authoritative for a zone, and at what level */
   bool getAuth(const DNSName &target, const QType &qtype, SOAData* sd, bool cachedOk=true);
@@ -122,6 +120,8 @@ public:
   bool removeDomainKey(const DNSName& name, unsigned int id);
   bool activateDomainKey(const DNSName& name, unsigned int id);
   bool deactivateDomainKey(const DNSName& name, unsigned int id);
+  bool publishDomainKey(const DNSName& name, unsigned int id);
+  bool unpublishDomainKey(const DNSName& name, unsigned int id);
 
   bool getTSIGKey(const DNSName& name, DNSName* algorithm, string* content);
   bool setTSIGKey(const DNSName& name, const DNSName& algorithm, const string& content);
@@ -160,8 +160,6 @@ private:
 
   int cacheHas(const Question &q, vector<DNSZoneRecord> &rrs);
   void addNegCache(const Question &q);
-  void addCache(const Question &q, const vector<DNSZoneRecord> &rrs);
+  void addCache(const Question &q, vector<DNSZoneRecord>&& rrs);
   
 };
-
-#endif

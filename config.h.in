@@ -36,6 +36,9 @@
 /* Defined if the Boost unit_test_framework library is available */
 #undef HAVE_BOOST_UNIT_TEST_FRAMEWORK
 
+/* Define to 1 if you have CDB */
+#undef HAVE_CDB
+
 /* Define to 1 if you have the <cdb.h> header file. */
 #undef HAVE_CDB_H
 
@@ -79,6 +82,9 @@
 
 /* Define to 1 if you have the `getrandom' function. */
 #undef HAVE_GETRANDOM
+
+/* Define to 1 if you have the `gmtime_r' function. */
+#undef HAVE_GMTIME_R
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -138,6 +144,9 @@
 /* Define to 1 if you have libzmq */
 #undef HAVE_LIBZMQ
 
+/* Define to 1 if you have LMDB */
+#undef HAVE_LMDB
+
 /* Define to 1 if you have the <lmdb.h> header file. */
 #undef HAVE_LMDB_H
 
@@ -158,9 +167,6 @@
 
 /* Define this if you have Maxmind DB */
 #undef HAVE_MMDB
-
-/* Define to 1 if you have the <odbx.h> header file. */
-#undef HAVE_ODBX_H
 
 /* Define to 1 if you have p11-kit-1 */
 #undef HAVE_P11KIT1

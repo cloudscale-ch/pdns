@@ -19,10 +19,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef STATBAG_HH
-#define STATBAG_HH
+#pragma once
 #include <pthread.h>
 #include <map>
+#include <mutex>
 #include <functional>
 #include <string>
 #include <vector>
@@ -32,15 +32,19 @@
 #include "circular_buffer.hh"
 
 
-
 template<typename T, typename Comp=std::less<T> >
 class StatRing
 {
 public:
   StatRing(unsigned int size=10000);
+  // Some older C++ libs have trouble emplacing without a copy-contructor, so provide one
+  StatRing(const StatRing &);
+  StatRing & operator=(const StatRing &) = delete;
+  
   void account(const T &item);
 
-  unsigned int getSize();
+  uint64_t getSize() const;
+  uint64_t getEntriesCount() const;
   void resize(unsigned int newsize);  
   void reset();
   void setHelp(const string &str);
@@ -54,7 +58,7 @@ private:
   }
 
   boost::circular_buffer<T> d_items;
-  mutable pthread_mutex_t d_lock;
+  mutable std::mutex d_lock;
   string d_help;
 };
 
@@ -62,7 +66,7 @@ private:
 //! use this to gather and query statistics
 class StatBag
 {
-  map<string, AtomicCounter *> d_stats;
+  map<string, std::unique_ptr<AtomicCounter>> d_stats;
   map<string, string> d_keyDescrips;
   map<string,StatRing<string, CIStringCompare> >d_rings;
   map<string,StatRing<SComboAddress> >d_comborings;
@@ -72,6 +76,8 @@ class StatBag
   funcstats_t d_funcstats;
   bool d_doRings;
   std::set<string> d_blacklist;
+
+  void registerRingStats(const string& name);
 
 public:
   StatBag(); //!< Naked constructor. You need to declare keys before this class becomes useful
@@ -119,7 +125,8 @@ public:
   bool ringExists(const string &name);
   void resetRing(const string &name);
   void resizeRing(const string &name, unsigned int newsize);
-  unsigned int getRingSize(const string &name);
+  uint64_t getRingSize(const string &name);
+  uint64_t getRingEntriesCount(const string &name);
 
   string directory(); //!< Returns a list of all data stored
   vector<string> getEntries(); //!< returns a vector with datums (items)
@@ -147,6 +154,3 @@ inline void StatBag::inc(const string &key)
 {
   deposit(key,1);
 }
-
-
-#endif /* STATBAG_HH */

@@ -30,6 +30,9 @@
 #include "dynhandler.hh"
 #include "dnsseckeeper.hh"
 #include "threadname.hh"
+#include "misc.hh"
+
+#include <thread>
 
 #ifdef HAVE_SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -40,6 +43,8 @@ bool g_8bitDNS;
 #ifdef HAVE_LUA_RECORDS
 bool g_doLuaRecord;
 int g_luaRecordExecLimit;
+time_t g_luaHealthChecksInterval{5};
+time_t g_luaHealthChecksExpireDelay{3600};
 #endif
 typedef Distributor<DNSPacket,DNSPacket,PacketHandler> DNSDistributor;
 
@@ -47,8 +52,8 @@ ArgvMap theArg;
 StatBag S;  //!< Statistics are gathered across PDNS via the StatBag class S
 AuthPacketCache PC; //!< This is the main PacketCache, shared across all threads
 AuthQueryCache QC;
-DNSProxy *DP;
-DynListener *dl;
+std::unique_ptr<DNSProxy> DP{nullptr};
+std::unique_ptr<DynListener> dl{nullptr};
 CommunicatorClass Communicator;
 shared_ptr<UDPNameserver> N;
 int avg_latency;
@@ -65,7 +70,7 @@ void declareArguments()
 {
   ::arg().set("config-dir","Location of configuration directory (pdns.conf)")=SYSCONFDIR;
   ::arg().set("config-name","Name of this virtual configuration - will rename the binary image")="";
-  ::arg().set("socket-dir",string("Where the controlsocket will live, ")+LOCALSTATEDIR+" when unset and not chrooted" )="";
+  ::arg().set("socket-dir",string("Where the controlsocket will live, ")+LOCALSTATEDIR+"/pdns when unset and not chrooted" )="";
   ::arg().set("module-dir","Default directory for modules")=PKGLIBDIR;
   ::arg().set("chroot","If set, chroot to this directory for more security")="";
   ::arg().set("logging-facility","Log under a specific facility")="";
@@ -81,12 +86,11 @@ void declareArguments()
   ::arg().setSwitch("forward-dnsupdate","A global setting to allow DNS update packages that are for a Slave domain, to be forwarded to the master.")="yes";
   ::arg().setSwitch("log-dns-details","If PDNS should log DNS non-erroneous details")="no";
   ::arg().setSwitch("log-dns-queries","If PDNS should log all incoming DNS queries")="no";
-  ::arg().set("local-address","Local IP addresses to which we bind")="0.0.0.0";
+  ::arg().set("local-address","Local IP addresses to which we bind")="0.0.0.0, ::";
+  ::arg().set("local-ipv6","DEPRECATED, will be removed, move your IPs to local-address")="";
   ::arg().setSwitch("local-address-nonexist-fail","Fail to start if one or more of the local-address's do not exist on this server")="yes";
   ::arg().setSwitch("non-local-bind", "Enable binding to non-local addresses by using FREEBIND / BINDANY socket options")="no";
-  ::arg().set("local-ipv6","Local IP address to which we bind")="::";
   ::arg().setSwitch("reuseport","Enable higher performance on compliant kernels by using SO_REUSEPORT allowing each receiver thread to open its own socket")="no";
-  ::arg().setSwitch("local-ipv6-nonexist-fail","Fail to start if one or more of the local-ipv6 addresses do not exist on this server")="yes";
   ::arg().set("query-local-address","Source IP address for sending queries")="0.0.0.0";
   ::arg().set("query-local-address6","Source IPv6 address for sending queries")="::";
   ::arg().set("overload-queue-length","Maximum queuelength moving to packetcache only")="0";
@@ -206,6 +210,8 @@ void declareArguments()
   ::arg().set("default-zsk-algorithm","Default ZSK algorithm")="";
   ::arg().set("default-zsk-size","Default ZSK size (0 means default)")="0";
   ::arg().set("max-nsec3-iterations","Limit the number of NSEC3 hash iterations")="500"; // RFC5155 10.3
+  ::arg().set("default-publish-cdnskey","Default value for PUBLISH-CDNSKEY")="";
+  ::arg().set("default-publish-cds","Default value for PUBLISH-CDS")="";
 
   ::arg().set("include-dir","Include *.conf files from this directory");
   ::arg().set("security-poll-suffix","Domain name from which to query security update notifications")="secpoll.powerdns.com.";
@@ -216,6 +222,8 @@ void declareArguments()
 #ifdef HAVE_LUA_RECORDS
   ::arg().setSwitch("enable-lua-records", "Process LUA records for all zones (metadata overrides this)")="no";
   ::arg().set("lua-records-exec-limit", "LUA records scripts execution limit (instructions count). Values <= 0 mean no limit")="1000";
+  ::arg().set("lua-health-checks-expire-delay", "Stops doing health checks after the record hasn't been used for that delay (in seconds)")="3600";
+  ::arg().set("lua-health-checks-interval", "LUA records health checks monitoring interval in seconds")="5";
 #endif
   ::arg().setSwitch("axfr-lower-serial", "Also AXFR a zone from a master with a lower serial")="no";
 
@@ -225,7 +233,10 @@ void declareArguments()
 
   ::arg().set("tcp-fast-open", "Enable TCP Fast Open support on the listening sockets, using the supplied numerical value as the queue size")="0";
 
+  ::arg().set("max-generate-steps", "Maximum number of $GENERATE steps when loading a zone from a file")="0";
+
   ::arg().set("rng", "Specify the random number generator to use. Valid values are auto,sodium,openssl,getrandom,arc4random,urandom.")="auto";
+  ::arg().setDefaults();
 }
 
 static time_t s_start=time(0);
@@ -256,7 +267,7 @@ static uint64_t getQCount(const std::string& str)
 try
 {
   int totcount=0;
-  for(DNSDistributor* d :  g_distributors) {
+  for(const auto& d : g_distributors) {
     if(!d)
       continue;
     totcount += d->getQueueSize();  // this does locking and other things, so don't get smart
@@ -336,6 +347,12 @@ void declareStats(void)
 
   S.declare("sys-msec", "Number of msec spent in system time", getSysUserTimeMsec);
   S.declare("user-msec", "Number of msec spent in user time", getSysUserTimeMsec);
+
+#ifdef __linux__
+  S.declare("cpu-iowait", "Time spent waiting for I/O to complete by the whole system, in units of USER_HZ", getCPUIOWait);
+  S.declare("cpu-steal", "Stolen time, which is the time spent by the whole system in other operating systems when running in a virtualized environment, in units of USER_HZ", getCPUSteal);
+#endif
+
   S.declare("meta-cache-size", "Number of entries in the metadata cache", DNSSECKeeper::dbdnssecCacheSizes);
   S.declare("key-cache-size", "Number of entries in the key cache", DNSSECKeeper::dbdnssecCacheSizes);
   S.declare("signature-cache-size", "Number of entries in the signature cache", signatureCacheSize);
@@ -362,28 +379,25 @@ int isGuarded(char **argv)
   return !!p;
 }
 
-void sendout(DNSPacket* a)
+static void sendout(std::unique_ptr<DNSPacket>& a)
 {
   if(!a)
     return;
   
-  N->send(a);
+  N->send(*a);
 
   int diff=a->d_dt.udiff();
   avg_latency=(int)(0.999*avg_latency+0.001*diff);
-  delete a;  
 }
 
 //! The qthread receives questions over the internet via the Nameserver class, and hands them to the Distributor for further processing
-void *qthread(void *number)
+static void qthread(unsigned int num)
 try
 {
   setThreadName("pdns/receiver");
 
-  DNSPacket *P;
-  DNSDistributor *distributor = DNSDistributor::Create(::arg().asNum("distributor-threads", 1)); // the big dispatcher!
-  int num = (int)(unsigned long)number;
-  g_distributors[num] = distributor;
+  g_distributors[num] = DNSDistributor::Create(::arg().asNum("distributor-threads", 1));
+  DNSDistributor* distributor = g_distributors[num]; // the big dispatcher!
   DNSPacket question(true);
   DNSPacket cached(false);
 
@@ -403,7 +417,7 @@ try
 
   // If we have SO_REUSEPORT then create a new port for all receiver threads
   // other than the first one.
-  if( number != NULL && N->canReusePort() ) {
+  if(N->canReusePort() ) {
     NS = g_udpReceivers[num];
     if (NS == nullptr) {
       NS = N;
@@ -413,75 +427,78 @@ try
   }
 
   for(;;) {
-    if(!(P=NS->receive(&question, buffer))) { // receive a packet         inline
+    if(!NS->receive(question, buffer)) { // receive a packet         inline
       continue;                    // packet was broken, try again
     }
 
     numreceived++;
 
-    if(P->d_remote.getSocklen()==sizeof(sockaddr_in))
+    if(question.d_remote.getSocklen()==sizeof(sockaddr_in))
       numreceived4++;
     else
       numreceived6++;
 
-    if(P->d_dnssecOk)
+    if(question.d_dnssecOk)
       numreceiveddo++;
 
-     if(P->d.qr)
+     if(question.d.qr)
        continue;
 
-    S.ringAccount("queries", P->qdomain, P->qtype);
-    S.ringAccount("remotes",P->d_remote);
+    S.ringAccount("queries", question.qdomain, question.qtype);
+    S.ringAccount("remotes", question.d_remote);
     if(logDNSQueries) {
       string remote;
-      if(P->hasEDNSSubnet()) 
-        remote = P->getRemote().toString() + "<-" + P->getRealRemote().toString();
+      if(question.hasEDNSSubnet()) 
+        remote = question.getRemote().toString() + "<-" + question.getRealRemote().toString();
       else
-        remote = P->getRemote().toString();
-      g_log << Logger::Notice<<"Remote "<< remote <<" wants '" << P->qdomain<<"|"<<P->qtype.getName() << 
-        "', do = " <<P->d_dnssecOk <<", bufsize = "<< P->getMaxReplyLen();
-      if(P->d_ednsRawPacketSizeLimit > 0 && P->getMaxReplyLen() != (unsigned int)P->d_ednsRawPacketSizeLimit)
-        g_log<<" ("<<P->d_ednsRawPacketSizeLimit<<")";
-      g_log<<": ";
+        remote = question.getRemote().toString();
+      g_log << Logger::Notice<<"Remote "<< remote <<" wants '" << question.qdomain<<"|"<<question.qtype.getName() << 
+        "', do = " <<question.d_dnssecOk <<", bufsize = "<< question.getMaxReplyLen();
+      if(question.d_ednsRawPacketSizeLimit > 0 && question.getMaxReplyLen() != (unsigned int)question.d_ednsRawPacketSizeLimit)
+        g_log<<" ("<<question.d_ednsRawPacketSizeLimit<<")";
     }
 
-    if(PC.enabled() && (P->d.opcode != Opcode::Notify && P->d.opcode != Opcode::Update) && P->couldBeCached()) {
-      bool haveSomething=PC.get(P, &cached); // does the PacketCache recognize this question?
+    if(PC.enabled() && (question.d.opcode != Opcode::Notify && question.d.opcode != Opcode::Update) && question.couldBeCached()) {
+      bool haveSomething=PC.get(question, cached); // does the PacketCache recognize this question?
       if (haveSomething) {
         if(logDNSQueries)
-          g_log<<"packetcache HIT"<<endl;
-        cached.setRemote(&P->d_remote);  // inlined
-        cached.setSocket(P->getSocket());                               // inlined
-        cached.d_anyLocal = P->d_anyLocal;
-        cached.setMaxReplyLen(P->getMaxReplyLen());
-        cached.d.rd=P->d.rd; // copy in recursion desired bit
-        cached.d.id=P->d.id;
+          g_log<<": packetcache HIT"<<endl;
+        cached.setRemote(&question.d_remote);  // inlined
+        cached.setSocket(question.getSocket());                               // inlined
+        cached.d_anyLocal = question.d_anyLocal;
+        cached.setMaxReplyLen(question.getMaxReplyLen());
+        cached.d.rd=question.d.rd; // copy in recursion desired bit
+        cached.d.id=question.d.id;
         cached.commitD(); // commit d to the packet                        inlined
-        NS->send(&cached); // answer it then                              inlined
-        diff=P->d_dt.udiff();
+        NS->send(cached); // answer it then                              inlined
+        diff=question.d_dt.udiff();
         avg_latency=(int)(0.999*avg_latency+0.001*diff); // 'EWMA'
         continue;
       }
     }
 
     if(distributor->isOverloaded()) {
-      if(logDNSQueries) 
-        g_log<<"Dropped query, backends are overloaded"<<endl;
+      if(logDNSQueries)
+        g_log<<": Dropped query, backends are overloaded"<<endl;
       overloadDrops++;
       continue;
     }
-        
-    if(PC.enabled() && logDNSQueries)
-      g_log<<"packetcache MISS"<<endl;
+
+    if (logDNSQueries) {
+      if (PC.enabled()) {
+        g_log<<": packetcache MISS"<<endl;
+      } else {
+        g_log<<endl;
+      }
+    }
 
     try {
-      distributor->question(P, &sendout); // otherwise, give to the distributor
+      distributor->question(question, &sendout); // otherwise, give to the distributor
     }
     catch(DistributorFatal& df) { // when this happens, we have leaked loads of memory. Bailing out time.
       _exit(1);
     }
   }
-  return 0;
 }
 catch(PDNSException& pe)
 {
@@ -507,12 +524,12 @@ void mainthread()
 {
    Utility::srandom();
 
-   int newgid=0;
-   if(!::arg()["setgid"].empty()) 
-     newgid=Utility::makeGidNumeric(::arg()["setgid"]);      
-   int newuid=0;      
-   if(!::arg()["setuid"].empty())        
-     newuid=Utility::makeUidNumeric(::arg()["setuid"]); 
+   gid_t newgid = 0;
+   if(!::arg()["setgid"].empty())
+     newgid = strToGID(::arg()["setgid"]);
+   uid_t newuid = 0;
+   if(!::arg()["setuid"].empty())
+     newuid = strToUID(::arg()["setuid"]);
    
    g_anyToTcp = ::arg().mustDo("any-to-tcp");
    g_8bitDNS = ::arg().mustDo("8bit-dns");
@@ -520,6 +537,8 @@ void mainthread()
    g_doLuaRecord = ::arg().mustDo("enable-lua-records");
    g_LuaRecordSharedState = (::arg()["enable-lua-records"] == "shared");
    g_luaRecordExecLimit = ::arg().asNum("lua-records-exec-limit");
+   g_luaHealthChecksInterval = ::arg().asNum("lua-health-checks-interval");
+   g_luaHealthChecksExpireDelay = ::arg().asNum("lua-health-checks-expire-delay");
 #endif
 
    DNSPacket::s_udpTruncationThreshold = std::max(512, ::arg().asNum("udp-truncation-threshold"));
@@ -528,6 +547,11 @@ void mainthread()
    PC.setTTL(::arg().asNum("cache-ttl"));
    PC.setMaxEntries(::arg().asNum("max-packet-cache-entries"));
    QC.setMaxEntries(::arg().asNum("max-cache-entries"));
+   DNSSECKeeper::setMaxEntries(::arg().asNum("max-cache-entries"));
+
+   if (!PC.enabled() && ::arg().mustDo("log-dns-queries")) {
+     g_log<<Logger::Warning<<"Packet cache disabled, logging queries without HIT/MISS"<<endl;
+   }
 
    stubParseResolveConf();
 
@@ -545,7 +569,7 @@ void mainthread()
         gethostbyname("a.root-servers.net"); // this forces all lookup libraries to be loaded
      Utility::dropGroupPrivs(newuid, newgid);
      if(chroot(::arg()["chroot"].c_str())<0 || chdir("/")<0) {
-       g_log<<Logger::Error<<"Unable to chroot to '"+::arg()["chroot"]+"': "<<strerror(errno)<<", exiting"<<endl; 
+       g_log<<Logger::Error<<"Unable to chroot to '"+::arg()["chroot"]+"': "<<stringerror()<<", exiting"<<endl; 
        exit(1);
      }   
      else
@@ -558,7 +582,7 @@ void mainthread()
   Utility::dropUserPrivs(newuid);
 
   if(::arg().mustDo("resolver")){
-    DP=new DNSProxy(::arg()["resolver"]);
+    DP=std::unique_ptr<DNSProxy>(new DNSProxy(::arg()["resolver"]));
     DP->go();
   }
 
@@ -607,8 +631,6 @@ void mainthread()
   // NOW SAFE TO CREATE THREADS!
   dl->go();
 
-  pthread_t qtid;
-
   if(::arg().mustDo("webserver") || ::arg().mustDo("api"))
     webserver.go();
 
@@ -617,13 +639,14 @@ void mainthread()
 
   TN->go(); // tcp nameserver launch
 
-  //  fork(); (this worked :-))
   unsigned int max_rthreads= ::arg().asNum("receiver-threads", 1);
   g_distributors.resize(max_rthreads);
-  for(unsigned int n=0; n < max_rthreads; ++n)
-    pthread_create(&qtid,0,qthread, reinterpret_cast<void *>(n)); // receives packets
+  for(unsigned int n=0; n < max_rthreads; ++n) {
+    std::thread t(qthread, n);
+    t.detach();
+  }
 
-  pthread_create(&qtid,0,carbonDumpThread, 0); // runs even w/o carbon, might change @ runtime    
+  std::thread carbonThread(carbonDumpThread); // runs even w/o carbon, might change @ runtime    
 
 #ifdef HAVE_SYSTEMD
   /* If we are here, notify systemd that we are ay-ok! This might have some
