@@ -7,7 +7,7 @@ Uploaders: Chris Hofstaedtler <zeha@debian.org>,
            Marc Haber <mh+debian-packages@zugschlus.de>
 Build-Depends: bison,
                curl,
-               debhelper-compat (= 12),
+               debhelper-compat (= 13),
                default-libmysqlclient-dev,
                dnsutils,
                flex,
