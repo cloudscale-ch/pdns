@@ -1,3 +1,9 @@
+pdns (4.3.0-3) unstable; urgency=medium
+
+  * Fix build failure on !amd64
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Sun, 03 May 2020 21:53:07 +0000
+
 pdns (4.3.0-2) unstable; urgency=medium
 
   * Re-release as 4.3.0-2 to work around upload problem.
