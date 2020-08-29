@@ -14,6 +14,7 @@ DBNAME=pdns
 DBHOST=localhost
 DBUSER=pdns
 DBPASS=password
+ZONE=pgsql.example.org
 
 runuser -u postgres -- psql postgres -c "CREATE ROLE $DBUSER WITH LOGIN PASSWORD '$DBPASS';"
 runuser -u postgres -- createdb --echo -O $DBUSER $DBNAME
@@ -35,19 +36,16 @@ sed -e '
 chmod 0640 /etc/powerdns/pdns.d/pdns.local.gpgsql.conf
 chgrp pdns /etc/powerdns/pdns.d/pdns.local.gpgsql.conf
 
-echo /etc/powerdns/pdns.d/pdns.local.gpgsql.conf follows:
-echo XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#####################################################################
 cat  /etc/powerdns/pdns.d/pdns.local.gpgsql.conf
-echo XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-# Other backends might be leftover from other test runs, so use a unique zone name.
-cat <<EOF >/etc/powerdns/pgsql.example.org
-pgsql.example.org.           172800  IN      SOA     ns1.example.org. dns.example.org. 1 10800 3600 604800 3600
-pgsql.example.org.           172800  IN      NS      ns1.example.org.
-smoke.pgsql.example.org.     172800  IN      A       127.0.0.125
+cat <<EOF >/etc/powerdns/$ZONE
+$ZONE.           172800  IN      SOA     ns1.example.org. dns.example.org. 1 10800 3600 604800 3600
+$ZONE.           172800  IN      NS      ns1.example.org.
+smoke.$ZONE.     172800  IN      A       127.0.0.222
 EOF
 
-zone2sql --gpgsql --zone-name=pgsql.example.org --zone=/etc/powerdns/pgsql.example.org | \
+zone2sql --gpgsql --zone-name=$ZONE --zone=/etc/powerdns/$ZONE | \
     PGPASSWORD="$DBPASS" psql -h "$DBHOST" -U "$DBUSER" "$DBNAME"
 
 service pdns restart
@@ -56,16 +54,17 @@ journalctl _SYSTEMD_UNIT=pdns.service -n 10 --no-pager || true
 TMPFILE=$(mktemp)
 cleanup() {
   rm -f "$TMPFILE"
+  journalctl _SYSTEMD_UNIT=pdns.service -n 100 --no-pager || true
   service pdns stop
 }
 trap cleanup EXIT
 
-dig @127.0.0.1 smoke.pgsql.example.org 2>&1 | tee "$TMPFILE"
+dig @127.0.0.1 smoke.$ZONE 2>&1 | tee "$TMPFILE"
 
-if grep -c '127\.0\.0\.125' "$TMPFILE"; then
+if grep -c '127\.0\.0\.222' "$TMPFILE"; then
     echo success
 else
-    echo smoke.pgsql.example.org could not be resolved
+    echo smoke.$ZONE could not be resolved
     exit 1
 fi
 

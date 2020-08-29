@@ -11,6 +11,13 @@ Depends: dnsutils,
          pdns-server
 Restrictions: needs-root, isolation-container
 
+Tests: smoke-mysql-sp
+Depends: dnsutils,
+         mariadb-server,
+         pdns-backend-mysql,
+         pdns-server
+Restrictions: needs-root, isolation-container
+
 Tests: smoke-pgsql
 Depends: dnsutils,
          pdns-backend-pgsql,
