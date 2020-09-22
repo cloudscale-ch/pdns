@@ -1,3 +1,13 @@
+pdns (4.1.6-3+deb10u1) buster; urgency=medium
+
+  * Apply upstream patches to fix CVE-2019-10203.
+    To actually fix this problem in existing installations, the newly
+    supplied schema file 4.1.10_to_4.1.11.schema.pgsql.sql has to be
+    manually applied to the backing PostgreSQL database. (Closes: #970729)
+  * Apply upstream patches to fix CVE-2020-17482 (Closes: #970737)
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Tue, 22 Sep 2020 19:07:45 +0000
+
 pdns (4.1.6-3) unstable; urgency=medium
 
   * Fix Denial of service via crafted zone records (CVE-2019-10162)
