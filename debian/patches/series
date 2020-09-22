@@ -2,3 +2,4 @@ CVE-2019-3871-auth-4.1.6.patch
 CVE-2019-10162-4.1.8-invalidrecords.patch
 CVE-2019-10163-4.1.8-busyloop.patch
 CVE-2019-10203.patch
+CVE-2020-17482.patch
